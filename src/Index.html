@@ -207,11 +207,11 @@
 <div class="mask" id="maskOperation"><div class="modal" style="max-width:1300px;width:96vw">
 <div class="mhead"><h3>교수학습 및 평가 운영 계획</h3><button class="x" data-close>×</button></div>
 <div class="mbody">
-<p class="note">교수학습-평가 계획은 현재 단원 설계에서 가져옵니다. 나머지 항목은 지난 학기 운영 계획 PDF를 올리면 AI가 읽어 초안을 채웁니다. 학년도·학기와 시기·시수·누계는 학교에 맞게 직접 확인합니다.</p>
-<div class="rowbtns"><select id="opSelect" aria-label="저장된 운영 계획"></select><button class="btn" id="opNew">새 운영 계획</button><button class="btn" id="opCopy">다른 학기용 복사 (일정 비우기)</button><button class="btn pri" id="opPdfTop">지난 학기 PDF로 채우기</button><input id="opPdfFileTop" type="file" accept="application/pdf,.pdf" hidden></div>
+<p class="note">선택한 과목의 단원과 수업 소재를 바탕으로 한 학기 약 17주 분량의 Ⅰ. 교수학습-평가 계획 초안을 만듭니다. 시기·시수·누계는 학교 행사와 시험 기간에 맞게 직접 수정하세요.</p>
+<div class="rowbtns"><select id="opSelect" aria-label="저장된 운영 계획"></select><button class="btn" id="opNew">새 과목 계획</button><button class="btn" id="opCopy">다른 학기용 복사 (일정 비우기)</button></div>
 <div id="opEditor"></div><p id="opStatus" role="status" class="note"></p>
 </div><div class="mfoot" style="flex-wrap:wrap">
-<button class="btn" id="opAppend">현재 단원 설계 추가</button><button class="btn" id="opPrompt">빈 항목 AI 프롬프트</button><button class="btn" id="opCheck">입력 점검</button><button class="btn" id="opJson">운영 계획 JSON 저장</button><button class="btn" id="opImport">JSON 불러오기</button><input id="opImportFile" type="file" accept="application/json" hidden>
+<button class="btn pri" id="opAppend">현재 과목 17주 초안 다시 만들기</button><button class="btn" id="opCheck">입력 점검</button><button class="btn" id="opJson">17주 계획 JSON 저장</button>
 <button class="btn" id="opPreview">미리보기</button><button class="btn pri" id="opDownload">운영 계획 한글 저장</button>
 </div></div></div>
 <div class="mask" id="maskOpPreview"><div class="modal" style="max-width:1300px;width:96vw"><div class="mhead"><h3>운영 계획 미리보기</h3><button class="x" data-close>×</button></div><div class="mbody" id="opPreviewHost"></div></div></div>

@@ -17,32 +17,18 @@ for (const u of c.getAllUnits_()) {
   const p=ui.opCurrent();
   for(const k of ['year','semester','credits'])assert.equal(p.meta[k],'');
   assert(p.sections.schedule.length>0,u.id);
-  if(u.id==='official-06-00') assert(p.sections.levels.length>0,u.id+' 공식 성취수준 미연결');
+  assert.equal(p.sections.schedule.length,17,u.id+' 17주 초안');
   for(const row of p.sections.schedule){
     for(const k of ['time','hours','cumulative'])assert.equal(row[k],'');
     for(const k of ['unit','standards','elements','methods'])assert(row[k]&&!row[k].includes('undefined'),u.id+' '+k);
   }
-  assert.equal(p.sections.overview[0].ratio,'');
-  assert.equal(p.sections.performance[0].cautions,'');
 }
-// PDF 모델이 표를 단일 객체 또는 sections 밖에 반환해도 병합한다.
-let importedPlan=ui.opEmpty();
-ui.opMergeImported(importedPlan,{meta:{year:'2024',school:'이전 학교'},sections:{purpose:'평가 목적',policy:'학교 규정 확인',levels:{standard:'[코드] 기준',level:'A',description:'설명'},prevention:{time:'3월',hours:'4',unit:'단원',method:'지도'}}});
-assert.equal(importedPlan.sections.purpose,'평가 목적');
-assert.equal(importedPlan.sections.levels.length,1);
-assert.equal(importedPlan.meta.year,'');
-assert.equal(importedPlan.meta.school,'이전 학교');
-assert.equal(importedPlan.sections.prevention[0].time,'');
-assert.equal(importedPlan.sections.prevention[0].hours,'');
 ui.state.stages[0].reconstructionTitle='직접 고친 단원 제목';
-ui.state.stages[2].task='직접 고친 수행과제';
 ui.state.operationPlans=[ui.opEmpty()];ui.opActive=0;ui.opAppend();
 let p=ui.opCurrent();
-assert(p.sections.schedule[0].unit.includes('직접 고친 단원 제목'));
-assert.equal(p.sections.performance[0].task,'직접 고친 수행과제');
+assert.equal(p.sections.schedule.length,17);
 p.meta.year='2031';p.meta.semester='1';
 Object.assign(p.sections.schedule[0],{time:'3월 둘째 주',hours:'0',cumulative:'학교 직접 입력',notes:'<수정> & 보존'});
-p.sections.outside=[{time:'방과 후',method:'개별 지도',content:'보충 학습',hours:'5'}];
 const restored=ui.opNormalize(JSON.parse(JSON.stringify(p)));
 assert.deepEqual(JSON.parse(JSON.stringify(restored.sections)),JSON.parse(JSON.stringify(p.sections)));
 const blocks=c.operationBlocks_(p);
@@ -54,7 +40,6 @@ assert(output.name.startsWith('2031_1학기_'));assert(Buffer.from(output.b64,'b
 ui.opCopy();const copy=ui.opCurrent();
 assert.equal(copy.meta.year,'');assert.equal(copy.meta.semester,'');
 assert.equal(copy.sections.schedule[0].time,'');assert.equal(copy.sections.schedule[0].hours,'');assert.equal(copy.sections.schedule[0].cumulative,'');
-assert.equal(copy.sections.outside[0].time,'');assert.equal(copy.sections.outside[0].hours,'');assert.equal(copy.sections.outside[0].content,'보충 학습');
 assert.equal(p.sections.schedule[0].time,'3월 둘째 주');
 assert.equal(copy.sections.schedule[0].notes,'<수정> & 보존');
 assert(!c.api_makeOperationHwpx(copy).name.includes('2031'));
