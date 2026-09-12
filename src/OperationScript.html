@@ -63,6 +63,29 @@ function opNormalize(raw){
  var p={meta:{},sections:{},sourceUnits:[]};BOOT.operationSchema.meta.forEach(function(c){p.meta[c[0]]=String(raw.meta[c[0]]==null?'':raw.meta[c[0]]);});
  BOOT.operationSchema.sections.forEach(function(s){if(s.cols){var rows=raw.sections[s.key]||[];if(!Array.isArray(rows))throw new Error(s.title+' 표 형식 오류');p.sections[s.key]=rows.map(function(r){var n={};s.cols.forEach(function(c){n[c[0]]=String(r[c[0]]==null?'':r[c[0]]);});return n;});}else p.sections[s.key]=String(raw.sections[s.key]||'');});return p;
 }
+function opMergeImported(p, imported){
+ if(!imported)return;
+ if(imported.meta)Object.keys(p.meta).forEach(function(k){if(imported.meta[k]&&(!p.meta[k]||k==='school'||k==='teacher'))p.meta[k]=String(imported.meta[k]);});
+ BOOT.operationSchema.sections.forEach(function(s){
+  if(s.key==='schedule'||!imported.sections||imported.sections[s.key]===undefined)return;
+  if(s.cols){var rows=imported.sections[s.key];if(Array.isArray(rows)&&rows.length)p.sections[s.key]=rows;}
+  else if(String(imported.sections[s.key]||'').trim())p.sections[s.key]=String(imported.sections[s.key]);
+ });
+}
+function opPdfFill(file){
+ if(!file)return; var reader=new FileReader(); reader.onload=function(){
+  var data=String(reader.result).split(',')[1]||''; $('opPdf').disabled=true; $('opStatus').textContent='지난 학기 PDF를 분석하고 있습니다. 잠시 기다려 주세요.';
+  var req={pdfBase64:data,filename:file.name,plan:opCurrent(),apiKey:(typeof localSettings!=='undefined'?localSettings.apiKey:''),model:(typeof localSettings!=='undefined'?localSettings.model:'')};
+  var done=function(r){$('opPdf').disabled=false;if(!r||!r.ok){toast((r&&r.message)||'PDF 분석에 실패했습니다.');return;}opMergeImported(opCurrent(),r.parsed);opCurrent().sourcePdf=file.name;opRender();save();$('opStatus').textContent='PDF 초안을 반영했습니다. 교수학습-평가 계획은 유지하고 나머지 항목만 갱신했습니다.';};
+  if(typeof google!=='undefined'&&google.script&&google.script.run)google.script.run.withSuccessHandler(done).withFailureHandler(function(e){$('opPdf').disabled=false;toast('PDF 분석 실패: '+e.message);}).api_extractOperationPlan(req);
+  else fetch('/api',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fn:'api_extractOperationPlan',args:[req]})}).then(function(x){return x.json();}).then(function(x){done(x.result||x);}).catch(function(e){$('opPdf').disabled=false;toast('PDF 분석 실패: '+e.message);});
+ };reader.readAsDataURL(file);
+}
+function opPrompt(){
+ var p=opCurrent(),missing=[];BOOT.operationSchema.sections.forEach(function(s){if(s.key==='schedule')return;var v=p.sections[s.key];if(s.cols?!v.length:!String(v||'').trim())missing.push(s.title);});
+ var text='다음 고등학교 수학과 교수학습 및 평가 운영 계획에서 비어 있는 항목만 학교 상황에 맞게 작성해 주세요. 공식 교육과정 문장과 학교 규정을 임의로 만들지 말고, 확인이 필요한 부분은 [확인 필요]로 표시하세요.\n\n과목: '+(p.meta.subject||'')+' / 학년: '+(p.meta.grade||'')+' / 학점: '+(p.meta.credits||'')+'\n지난 학기 PDF를 참고한 내용:\n'+missing.join('\n')+'\n\n출력은 다음 항목별 제목과 표 또는 문단으로 작성하세요. 학년도, 학기, 시기, 시수, 누계는 직접 입력하지 말고 빈칸으로 두세요.';
+ opDownloadBlob(new Blob([text],{type:'text/plain;charset=utf-8'}),'운영계획_빈항목_AI프롬프트.txt');$('opStatus').textContent='비어 있는 항목용 AI 프롬프트를 저장했습니다.';
+}
 function opDownload(){
  opCheck();$('opDownload').disabled=true;
  google.script.run.withSuccessHandler(function(r){$('opDownload').disabled=false;var bin=atob(r.b64),a=new Uint8Array(bin.length);for(var i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i);opDownloadBlob(new Blob([a],{type:'application/hwp+zip'}),r.name);toast('운영 계획 한글 파일을 내려받았습니다.');}).withFailureHandler(function(e){$('opDownload').disabled=false;toast('저장 실패: '+e.message);}).api_makeOperationHwpx(opCurrent());
@@ -74,7 +97,7 @@ function opPreview(){
 }
 window.addEventListener('DOMContentLoaded',function(){
  $('btnOperation').onclick=function(){if(!BOOT){toast('자료를 불러오는 중입니다.');return;}if(!opPlans().length)opAdd();else opRender();openMask('maskOperation');};
- $('opSelect').onchange=function(){opActive=Number(this.value);opRender();};$('opNew').onclick=opAdd;$('opCopy').onclick=opCopy;$('opAppend').onclick=opAppend;$('opCheck').onclick=opCheck;$('opJson').onclick=opExport;$('opPreview').onclick=opPreview;$('opDownload').onclick=opDownload;
+ $('opSelect').onchange=function(){opActive=Number(this.value);opRender();};$('opNew').onclick=opAdd;$('opCopy').onclick=opCopy;$('opAppend').onclick=opAppend;$('opPdf').onclick=function(){$('opPdfFile').click();};$('opPdfFile').onchange=function(){opPdfFill(this.files[0]);this.value='';};$('opPrompt').onclick=opPrompt;$('opCheck').onclick=opCheck;$('opJson').onclick=opExport;$('opPreview').onclick=opPreview;$('opDownload').onclick=opDownload;
  $('opImport').onclick=function(){$('opImportFile').click();};$('opImportFile').onchange=function(){var file=this.files[0];if(!file)return;var r=new FileReader();r.onload=function(){try{opPlans().push(opNormalize(JSON.parse(r.result)));opActive=opPlans().length-1;opRender();save();}catch(e){toast('불러오기 실패: '+e.message);}};r.readAsText(file);this.value='';};
 });
 </script>

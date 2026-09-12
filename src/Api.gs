@@ -34,6 +34,22 @@ function api_bootstrap() {
   };
 }
 
+/** 지난 학기 운영 계획 PDF에서 현재 교수학습-평가 계획을 제외한 항목을 구조화한다. */
+function api_extractOperationPlan(req) {
+  var key=getApiKey_(req), model=(req&&req.model)||DEFAULT_MODEL;
+  if(!key) return {ok:false,error:'NO_KEY',message:'PDF 분석에는 Gemini API 키가 필요합니다.'};
+  var schema=api_operationSchema(), shape={meta:{},sections:{}};
+  schema.meta.forEach(function(c){shape.meta[c[0]]='';});
+  schema.sections.forEach(function(s){if(s.key==='schedule')return;shape.sections[s.key]=s.cols?[{}]:'';});
+  var prompt='첨부한 지난 학기 수학과 교수학습 및 평가 운영 계획 PDF를 읽고 JSON으로 구조화하세요. 현재 새 계획의 Ⅰ. 교수학습-평가 계획(schedule)은 절대 출력하거나 변경하지 않습니다. PDF에서 확인되는 나머지 메타데이터와 Ⅱ~Ⅲ 및 별첨 내용을 최대한 보존해 옮기세요. 날짜·시기·시수·누계는 학교마다 다를 수 있으므로 새 값으로 추정하지 말고 빈 문자열로 두세요. 확인이 불가능한 학교 규정도 빈 문자열로 둡니다. 아래 JSON 모양을 지키고 설명이나 코드블록은 쓰지 마세요.\n'+JSON.stringify(shape);
+  try {
+    var res=UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(model)+':generateContent?key='+encodeURIComponent(key),{method:'post',contentType:'application/json',payload:JSON.stringify({contents:[{role:'user',parts:[{text:prompt},{inline_data:{mime_type:'application/pdf',data:String(req.pdfBase64||'')}}]}],generationConfig:{temperature:0.1,maxOutputTokens:8192}}),muteHttpExceptions:true});
+    var body=JSON.parse(res.getContentText());if(res.getResponseCode()>=300)throw new Error('Gemini 응답 오류('+res.getResponseCode()+')');
+    var text='';((body.candidates||[])[0].content.parts||[]).forEach(function(x){if(x.text)text+=x.text;});
+    return {ok:true,parsed:parseModelJson_(text),source:'pdf'};
+  } catch(e){return {ok:false,error:'PDF_PARSE',message:e.message};}
+}
+
 /* ------------------------------------------------------------------ */
 /* 2. 설정                                                             */
 /* ------------------------------------------------------------------ */
