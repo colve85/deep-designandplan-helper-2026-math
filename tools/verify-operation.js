@@ -11,13 +11,12 @@ for (const file of ['Script.html','OperationScript.html']) {
 }
 ui.BOOT=c.api_bootstrap();
 ui.opRender=ui.save=ui.toast=function(){};
-assert(ui.opHighSubjects_().length>1);
-assert(!ui.opHighSubjects_().includes('중학교 수학'));
+assert(ui.opAllSubjects_().length>1);
+assert(ui.opAllSubjects_().includes('중학교 수학'));
 for (const u of c.getAllUnits_()) {
   ui.state.unitId=u.id;ui.state.stages={0:{},1:{},2:{},3:{}};ui.state.lessons=[];
   ui.state.operationPlans=[ui.opEmpty()];ui.opActive=0;ui.opAppend();
   const p=ui.opCurrent();
-  assert.notEqual(p.meta.subject,'중학교 수학',u.id+' 운영 계획은 고등학교 과목이어야 함');
   for(const k of ['year','semester','credits'])assert.equal(p.meta[k],'');
   assert(p.sections.schedule.length>0,u.id);
   assert.equal(p.sections.schedule.length,17,u.id+' 17주 초안');
