@@ -154,4 +154,4 @@ clasp deploy
 
 ## 2.7.0 업데이트
 
-저장소 루트에 이 배포본의 파일을 같은 경로로 업로드하여 교체합니다. ZIP 자체나 상위 폴더를 올리지 않습니다. 기존 파일을 먼저 모두 삭제할 필요는 없습니다. `src/OperationPlan.gs`, `src/OperationScript.html`, `src/AchievementLevels.gs`를 포함한 전체 소스를 반영하세요. Apps Script에서는 `src`의 .gs 12개와 .html 4개가 모두 필요합니다. 새 버전으로 배포한 뒤 화면 버전이 2.8.0인지 확인합니다.
+저장소 루트에 이 배포본의 파일을 같은 경로로 업로드하여 교체합니다. ZIP 자체나 상위 폴더를 올리지 않습니다. 기존 파일을 먼저 모두 삭제할 필요는 없습니다. `src/OperationPlan.gs`, `src/OperationScript.html`, `src/AchievementLevels.gs`를 포함한 전체 소스를 반영하세요. Apps Script에서는 `src`의 .gs 12개와 .html 4개가 모두 필요합니다. 새 버전으로 배포한 뒤 화면 버전이 2.8.1인지 확인합니다.

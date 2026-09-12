@@ -2,24 +2,27 @@
 var opActive=0;
 function opPlans(){if(!Array.isArray(state.operationPlans))state.operationPlans=[];return state.operationPlans;}
 function opCurrent(){return opPlans()[opActive];}
+function opHighUnit_(){var u=currentUnit();if(u&&u.subject!=='중학교 수학')return u;return (BOOT.units||[]).find(function(x){return x.subject&&x.subject!=='중학교 수학';})||u;}
+function opHighSubjects_(){var seen={},out=[];(BOOT.units||[]).forEach(function(u){if(u.subject&&u.subject!=='중학교 수학'&&!seen[u.subject]){seen[u.subject]=1;out.push(u.subject);}});return out;}
 function opEmpty(){
  var p={meta:{},sections:{},sourceUnits:[]};
  BOOT.operationSchema.meta.forEach(function(c){p.meta[c[0]]='';});
  BOOT.operationSchema.sections.forEach(function(s){p.sections[s.key]=s.cols?[]:'';});
- var u=currentUnit();p.meta.school=state.meta.school||'';p.meta.teacher=state.meta.teacher||'';p.meta.subject=u?u.subject:'';p.meta.grade=state.meta.grade||'';
+ var u=opHighUnit_();p.meta.school=state.meta.school||'';p.meta.teacher=state.meta.teacher||'';p.meta.subject=u?u.subject:'';p.meta.grade=u&&u.subject!=='중학교 수학'?(state.meta.grade||''):'1학년';
  return p;
 }
 function opCourseRows_(subject){
- var units=(BOOT.units||[]).filter(function(u){return !subject||u.subject===subject;}),cards=[];
- units.forEach(function(u){var lessons=u.lessons&&u.lessons.length?u.lessons:[{element:'핵심 개념 이해',activity:'개념과 표현을 탐구하고 근거를 설명한다.',evidence:'학습지·구두 설명',goal:'핵심 개념을 조건과 함께 설명한다.'}];lessons.forEach(function(l){cards.push({u:u,l:l});});});
- if(!cards.length)return [];
- var out=[];
- for(var i=0;i<17;i++){var card=cards[Math.min(cards.length-1,Math.floor(i*cards.length/17))],u=card.u,l=card.l;
-  out.push({time:'',hours:'',cumulative:'',unit:u.area+' / '+u.name,standards:(u.standards||[]).map(function(s){return '['+s.code+'] '+s.text;}).join('\n'),elements:l.goal||l.element||u.ex.elements,methods:'수업: '+(l.activity||'개념 탐구와 적용')+'\n평가 증거: '+(l.evidence||'학생 설명·풀이·성찰')+'\n연계 주안점: '+(l.goal||'개념을 새로운 사례에 적용한다.'),notes:'학교 행사·시험 기간에 맞게 시기와 차시를 조정하세요.'});
+ var units=(BOOT.units||[]).filter(function(u){return !subject||u.subject===subject;}),cards=[],all=[],seen={};
+ units.forEach(function(u){(u.standards||[]).forEach(function(s){if(!seen[s.code]){seen[s.code]=1;all.push({s:s,u:u});}});var lessons=u.lessons&&u.lessons.length?u.lessons:[{element:'핵심 개념 이해',activity:'개념과 표현을 탐구하고 근거를 설명한다.',evidence:'학습지·구두 설명',goal:'핵심 개념을 조건과 함께 설명한다.'}];lessons.forEach(function(l){cards.push({u:u,l:l});});});
+ if(!units.length)return [];
+ var out=[],n=17;
+ for(var i=0;i<n;i++){var start=Math.floor(i*all.length/n),end=Math.floor((i+1)*all.length/n),subset=all.slice(start,end);if(!subset.length&&all.length)subset=[all[Math.min(all.length-1,start)]];var card=cards[Math.min(cards.length-1,Math.floor(i*cards.length/n))],u=card.u,l=card.l;
+  out.push({time:'',hours:'',cumulative:'',unit:(subset.map(function(x){return x.u.area+' / '+x.u.name;}).filter(function(v,j,a){return a.indexOf(v)===j;}).join('\n')||u.area+' / '+u.name),standards:subset.map(function(x){return '['+x.s.code+'] '+x.s.text;}).join('\n'),elements:l.goal||l.element||u.ex.elements,methods:'수업: '+(l.activity||'개념 탐구와 적용')+'\n평가 증거: '+(l.evidence||'학생 설명·풀이·성찰')+'\n연계 주안점: '+(l.goal||'개념을 새로운 사례에 적용한다.'),notes:'학교 행사·시험 기간에 맞게 시기와 차시를 조정하세요.'});
  }
  return out;
 }
-function opSeedSchedule(p,force){var subject=p.meta.subject||(currentUnit()&&currentUnit().subject)||'';if(!force&&p.sections.schedule&&p.sections.schedule.length)return;if(subject)p.sections.schedule=opCourseRows_(subject);}
+function opSeedSchedule(p,force){var subject=p.meta.subject||((opHighUnit_()||{}).subject)||'';if(subject==='중학교 수학')subject=((BOOT.units||[]).find(function(x){return x.subject&&x.subject!=='중학교 수학';})||{}).subject||'';if(!force&&p.sections.schedule&&p.sections.schedule.length)return;if(subject){p.meta.subject=subject;p.sections.schedule=opCourseRows_(subject);p._scheduleDraftVersion='2.8.0';}}
+function opMigratePlan_(p){if(!p||!p.sections)return;if(p._scheduleDraftVersion&&p.meta.subject!=='중학교 수학')return;var oldKeys=Object.keys(p.sections).filter(function(k){return k!=='schedule';});if(oldKeys.length||p.meta.subject==='중학교 수학'){p.sections={schedule:[]};p._scheduleDraftVersion='';p.meta.subject='';}opSeedSchedule(p,false);p._scheduleDraftVersion='2.8.0';}
 function opAdd(){var p=opEmpty();opSeedSchedule(p,false);opPlans().push(p);opActive=opPlans().length-1;opRender();save();}
 function opCopy(){
  var p=JSON.parse(JSON.stringify(opCurrent()));p.meta.year='';p.meta.semester='';
@@ -38,9 +41,9 @@ function opEnsureCurrentLevels(p){
 }
 function opRender(){
  if(opActive>=opPlans().length)opActive=0;
- var p=opCurrent(),schema=BOOT.operationSchema;if(!p)return;opSeedSchedule(p,false);
+ var p=opCurrent(),schema=BOOT.operationSchema;if(!p)return;opMigratePlan_(p);opSeedSchedule(p,false);
  $('opSelect').innerHTML=opPlans().map(function(x,i){return '<option value="'+i+'"'+(i===opActive?' selected':'')+'>'+esc((x.meta.year||'학년도 미입력')+' / '+(x.meta.semester||'학기 미입력')+' / '+(x.meta.subject||'과목 미입력')+' ('+(i+1)+')')+'</option>';}).join('');
- var html='<div class="op-meta">'+schema.meta.map(function(c){return '<label>'+esc(c[1])+'<input data-om="'+c[0]+'" value="'+esc(p.meta[c[0]])+'"></label>';}).join('')+'</div>';
+ var html='<div class="op-meta">'+schema.meta.map(function(c){if(c[0]==='subject')return '<label>'+esc(c[1])+'<select data-om="subject" aria-label="고등학교 수학 과목">'+opHighSubjects_().map(function(s){return '<option value="'+esc(s)+'"'+(s===p.meta.subject?' selected':'')+'>'+esc(s)+'</option>';}).join('')+'</select></label>';return '<label>'+esc(c[1])+'<input data-om="'+c[0]+'" value="'+esc(p.meta[c[0]])+'"></label>';}).join('')+'</div>';
  schema.sections.forEach(function(s){
   html+='<details'+(s.key==='schedule'?' open':'')+'><summary>'+esc(s.title)+'</summary>';
   if(!s.cols)html+='<textarea rows="5" data-os="'+s.key+'" aria-label="'+esc(s.title)+'">'+esc(p.sections[s.key])+'</textarea>';
@@ -51,11 +54,12 @@ function opRender(){
   }html+='</details>';
  });$('opEditor').innerHTML=html;
  $('opEditor').oninput=function(e){var t=e.target;if(t.hasAttribute('data-om'))p.meta[t.dataset.om]=t.value;else if(t.hasAttribute('data-os'))p.sections[t.dataset.os]=t.value;else if(t.hasAttribute('data-ot'))p.sections[t.dataset.ot][Number(t.dataset.or)][t.dataset.ok]=t.value;save();};
+ $('opEditor').onchange=function(e){var t=e.target;if(t.getAttribute('data-om')==='subject'){p.meta.subject=t.value;opSeedSchedule(p,true);opRender();save();}};
  $('opEditor').onclick=function(e){var t=e.target;if(t.dataset.oa){p.sections[t.dataset.oa].push({});}else if(t.dataset.od){p.sections[t.dataset.od].splice(Number(t.dataset.or),1);}else if(t.dataset.ou){var i=Number(t.dataset.or),a=p.sections[t.dataset.ou];if(i>0){var x=a[i-1];a[i-1]=a[i];a[i]=x;}}else return;var details=t.closest('details'),key=details&&details.querySelector('[data-oa]');key=key&&key.dataset.oa;opRender();if(key){var add=$('opEditor').querySelector('[data-oa="'+key+'"]');if(add)add.closest('details').open=true;}save();};
 }
 function opAppend(){
- var p=opCurrent(),u=currentUnit();if(!u){toast('과목을 먼저 선택하세요.');return;}
- p.meta.subject=u.subject;opSeedSchedule(p,true);opRender();save();toast('현재 과목의 17주 초안을 만들었습니다. 학교 행사·시험 기간에 맞게 수정하세요.');
+ var p=opCurrent(),subject=p.meta.subject||((opHighUnit_()||{}).subject);if(!subject||subject==='중학교 수학'){toast('고등학교 수학 과목을 선택하세요.');return;}
+ p.meta.subject=subject;p.sections.schedule=opCourseRows_(subject);p._scheduleDraftVersion='2.8.0';opRender();save();toast('고등학교 '+subject+'의 전체 성취기준을 17주 초안으로 만들었습니다. 학교 행사·시험 기간에 맞게 수정하세요.');
 }
 function opWarnings(p){
  var out=[];['year','semester','subject'].forEach(function(k){if(!String(p.meta[k]||'').trim())out.push(k==='year'?'학년도 미입력':k==='semester'?'학기 미입력':'과목 미입력');});

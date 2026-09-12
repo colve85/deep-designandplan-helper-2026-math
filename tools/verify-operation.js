@@ -11,10 +11,13 @@ for (const file of ['Script.html','OperationScript.html']) {
 }
 ui.BOOT=c.api_bootstrap();
 ui.opRender=ui.save=ui.toast=function(){};
+assert(ui.opHighSubjects_().length>1);
+assert(!ui.opHighSubjects_().includes('중학교 수학'));
 for (const u of c.getAllUnits_()) {
   ui.state.unitId=u.id;ui.state.stages={0:{},1:{},2:{},3:{}};ui.state.lessons=[];
   ui.state.operationPlans=[ui.opEmpty()];ui.opActive=0;ui.opAppend();
   const p=ui.opCurrent();
+  assert.notEqual(p.meta.subject,'중학교 수학',u.id+' 운영 계획은 고등학교 과목이어야 함');
   for(const k of ['year','semester','credits'])assert.equal(p.meta[k],'');
   assert(p.sections.schedule.length>0,u.id);
   assert.equal(p.sections.schedule.length,17,u.id+' 17주 초안');
@@ -23,6 +26,15 @@ for (const u of c.getAllUnits_()) {
     for(const k of ['unit','standards','elements','methods'])assert(row[k]&&!row[k].includes('undefined'),u.id+' '+k);
   }
 }
+const calculus= c.api_bootstrap().units.filter(u=>u.subject==='미적분Ⅰ');
+// 과목 전체 기준이 17주 표에 빠짐없이 들어가는지 확인한다.
+ui.state.unitId='official-06-00';ui.state.operationPlans=[ui.opEmpty()];ui.opActive=0;ui.opAppend();
+const coursePlan=ui.opCurrent(), joined=coursePlan.sections.schedule.map(r=>r.standards).join('\n');
+assert.equal(coursePlan.sections.schedule.length,17);
+for(const u of calculus)for(const s of u.standards)assert(joined.includes('['+s.code+']'),s.code+' 과목 전체 기준 누락');
+// 이전 버전의 별도 섹션을 가진 저장 계획은 Ⅰ 표만 남긴다.
+const oldPlan=ui.opEmpty();oldPlan.sections={schedule:[],purpose:'옛 내용',levels:[{standard:'옛 기준'}]};oldPlan.meta.subject='미적분Ⅰ';ui.state.operationPlans=[oldPlan];ui.opActive=0;ui.opMigratePlan_(oldPlan);
+assert.deepEqual(Object.keys(ui.opCurrent().sections),['schedule']);assert.equal(ui.opCurrent().sections.schedule.length,17);
 ui.state.stages[0].reconstructionTitle='직접 고친 단원 제목';
 ui.state.operationPlans=[ui.opEmpty()];ui.opActive=0;ui.opAppend();
 let p=ui.opCurrent();
