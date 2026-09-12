@@ -15,9 +15,19 @@ function opCopy(){
  BOOT.operationSchema.sections.forEach(function(s){if(s.cols)(p.sections[s.key]||[]).forEach(function(r){['time','hours','cumulative','periods','prevention','supplement','additional','recognition'].forEach(function(k){if(k in r)r[k]='';});});});
  opPlans().push(p);opActive=opPlans().length-1;opRender();save();toast('복사했습니다. 학년도·학기·일정·시수를 직접 입력하세요.');
 }
+function opOfficialLevelRows(u){
+ var out=[],text=String((u&&u.ex&&u.ex.achievementLevels)||''),current=null;
+ text.split(/\r?\n/).forEach(function(line){var cm=line.match(/^\[([^\]]+)\]\s*(.*)$/);if(cm){current={code:cm[1],text:cm[2]};return;}var lm=line.match(/^([ABCDE])\s*[—-]\s*(.+)$/);if(current&&lm)out.push({standard:'['+current.code+'] '+current.text,level:lm[1],description:lm[2]});});
+ return out;
+}
+function opEnsureCurrentLevels(p){
+ var rows=opOfficialLevelRows(currentUnit());if(!rows.length)return;
+ var seen={};(p.sections.levels||[]).forEach(function(r){seen[String(r.standard||'')+'|'+String(r.level||'')]=true;});
+ p.sections.levels=(p.sections.levels||[]).concat(rows.filter(function(r){return !seen[r.standard+'|'+r.level];}));
+}
 function opRender(){
  if(opActive>=opPlans().length)opActive=0;
- var p=opCurrent(),schema=BOOT.operationSchema;if(!p)return;
+ var p=opCurrent(),schema=BOOT.operationSchema;if(!p)return;opEnsureCurrentLevels(p);
  $('opSelect').innerHTML=opPlans().map(function(x,i){return '<option value="'+i+'"'+(i===opActive?' selected':'')+'>'+esc((x.meta.year||'학년도 미입력')+' / '+(x.meta.semester||'학기 미입력')+' / '+(x.meta.subject||'과목 미입력')+' ('+(i+1)+')')+'</option>';}).join('');
  var html='<div class="op-meta">'+schema.meta.map(function(c){return '<label>'+esc(c[1])+'<input data-om="'+c[0]+'" value="'+esc(p.meta[c[0]])+'"></label>';}).join('')+'</div>';
  schema.sections.forEach(function(s){
@@ -38,6 +48,14 @@ function opAppend(){
  if((p.sourceUnits||[]).indexOf(u.id)>=0&&!confirm('이미 추가한 단원입니다. 다시 추가할까요?'))return;
  var d=state.stages||{},s0=d[0]||{},s2=d[2]||{},s3=d[3]||{},rows=state.lessons.length?state.lessons:u.lessons;
  var standards=selectedStandards(u).map(function(s){return '['+s.code+'] '+s.text;}).join('\n');
+ // 운영 계획의 별첨 1은 선택한 단원의 공식 성취기준별 A~E 진술에서 채운다.
+ // 단원 추가를 다시 눌러도 같은 기준이 중복되지 않도록 코드로 병합한다.
+ var levelRows=opOfficialLevelRows(u), levelMap={};
+ if(levelRows.length){
+   (p.sections.levels||[]).forEach(function(r){levelMap[String(r.standard||'')+'|'+String(r.level||'')]=true;});
+   levelRows=levelRows.filter(function(r){return !levelMap[r.standard+'|'+r.level];});
+   p.sections.levels=(p.sections.levels||[]).concat(levelRows);
+ }
  (rows||[]).forEach(function(l){p.sections.schedule.push({time:'',hours:'',cumulative:'',unit:u.area+' / '+(s0.reconstructionTitle||u.name)+'\n'+(l.element||''),standards:standards,elements:l.goal||s2.elements||u.ex.elements,methods:'수업: '+(l.activity||s3.activity||'')+'\n평가 증거: '+(l.evidence||s2.evidence||'')+'\n연계 주안점: '+(l.goal||'')+'\n도구: '+(l.tool||''),notes:''});});
  p.sections.performance.push({area:u.name,task:s2.task||u.ex.task,standards:standards,criteria:s2.rubric||u.ex.rubric,method:s2.plan||u.ex.plan,cautions:''});
  p.sections.overview.push({type:'수행평가',area:u.name,method:'',max:'',ratio:'',standards:standards,base:'',time:''});
@@ -65,11 +83,14 @@ function opNormalize(raw){
 }
 function opMergeImported(p, imported){
  if(!imported)return;
+ // 모델이 sections 없이 항목을 최상위에 놓거나, 표를 단일 객체로 반환한 경우도 수용한다.
+ if(imported.plan&&typeof imported.plan==='object')imported=imported.plan;
+ var source=imported.sections||(imported.data&&imported.data.sections)||imported;
  if(imported.meta)Object.keys(p.meta).forEach(function(k){if(imported.meta[k]&&(!p.meta[k]||k==='school'||k==='teacher'))p.meta[k]=String(imported.meta[k]);});
  BOOT.operationSchema.sections.forEach(function(s){
-  if(s.key==='schedule'||!imported.sections||imported.sections[s.key]===undefined)return;
-  if(s.cols){var rows=imported.sections[s.key];if(Array.isArray(rows)&&rows.length)p.sections[s.key]=rows;}
-  else if(String(imported.sections[s.key]||'').trim())p.sections[s.key]=String(imported.sections[s.key]);
+  if(s.key==='schedule'||source[s.key]===undefined)return;
+  if(s.cols){var rows=source[s.key];if(rows&&typeof rows==='object'&&!Array.isArray(rows))rows=[rows];if(Array.isArray(rows)&&rows.length){var clean=rows.filter(function(r){return r&&Object.keys(r).some(function(k){return String(r[k]||'').trim();});});if(clean.length)p.sections[s.key]=clean;}}
+  else if(String(source[s.key]||'').trim())p.sections[s.key]=String(source[s.key]);
  });
 }
 function opPdfFill(file){

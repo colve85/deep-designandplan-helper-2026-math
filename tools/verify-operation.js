@@ -17,6 +17,7 @@ for (const u of c.getAllUnits_()) {
   const p=ui.opCurrent();
   for(const k of ['year','semester','credits'])assert.equal(p.meta[k],'');
   assert(p.sections.schedule.length>0,u.id);
+  if(u.id==='official-06-00') assert(p.sections.levels.length>0,u.id+' 공식 성취수준 미연결');
   for(const row of p.sections.schedule){
     for(const k of ['time','hours','cumulative'])assert.equal(row[k],'');
     for(const k of ['unit','standards','elements','methods'])assert(row[k]&&!row[k].includes('undefined'),u.id+' '+k);
@@ -24,6 +25,11 @@ for (const u of c.getAllUnits_()) {
   assert.equal(p.sections.overview[0].ratio,'');
   assert.equal(p.sections.performance[0].cautions,'');
 }
+// PDF 모델이 표를 단일 객체 또는 sections 밖에 반환해도 병합한다.
+let importedPlan=ui.opEmpty();
+ui.opMergeImported(importedPlan,{sections:{purpose:'평가 목적',policy:'학교 규정 확인',levels:{standard:'[코드] 기준',level:'A',description:'설명'}}});
+assert.equal(importedPlan.sections.purpose,'평가 목적');
+assert.equal(importedPlan.sections.levels.length,1);
 ui.state.stages[0].reconstructionTitle='직접 고친 단원 제목';
 ui.state.stages[2].task='직접 고친 수행과제';
 ui.state.operationPlans=[ui.opEmpty()];ui.opActive=0;ui.opAppend();
