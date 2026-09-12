@@ -208,7 +208,8 @@ function renderStandards(){
   box.innerHTML=officialMeta+(u.sourceNote?'<p class="note">'+esc(u.sourceNote)+'</p>':'')+standards.map(function(s){
     return '<p><span class="code">['+esc(s.code)+']</span> '+esc(s.text)+'</p>';
   }).join('')+
-    '<details><summary>성취기준 원문 입력·수정</summary><p class="note">한 줄에 코드 | 원문을 입력합니다. 입력 내용은 이 단원의 프롬프트·미리보기·한글 문서에 함께 적용됩니다.</p>'+
+    '<details><summary>성취기준별 성취수준 (공식 A~E)</summary><p class="note">공식 성취수준 자료에서 해당 성취기준 코드와 연결한 진술입니다. 연결되지 않은 과목·코드는 공식 문서 확인 필요로 표시됩니다.</p><textarea rows="10" aria-label="성취기준별 성취수준" readonly>'+esc(u.ex&&u.ex.achievementLevels||'')+'</textarea></details>'+ 
+    '<details><summary>성취기준 원문 입력·수정</summary><p class="note">한 줄에 코드 | 원문을 입력합니다. 입력 내용은 이 단원의 프롬프트·미리보기·한글 문서에 함께 적용됩니다.</p>'+ 
     '<textarea id="stdEdit" rows="6" aria-label="성취기준 원문">'+esc(standards.map(function(s){return s.code+' | '+s.text;}).join('\n'))+'</textarea><button type="button" class="btn" id="stdApply">성취기준 적용</button><button type="button" class="btn" id="stdReset">기본 예시로 복원</button></details>';
   $('stdApply').onclick=function(){
     var lines=$('stdEdit').value.split('\n').filter(function(v){return v.trim();}), out=[];
@@ -609,6 +610,7 @@ function openPrompt(stageId, prefill, kind){
   if(!u){ toast('먼저 단원을 선택하세요.'); return; }
   pasteStageId=stageId; pasteKind=kind||'stage';
   $('inPasted').value=prefill||'';
+  $('pasteStatus').textContent='';
   $('promptText').textContent='프롬프트를 만드는 중…';
   openMask('maskPrompt');
   var req=buildRequest(stageId,pasteKind);
@@ -639,17 +641,23 @@ function applyPasted(){
   google.script.run
     .withSuccessHandler(function(res){
       if(!res.ok){
+        if(res.message){toast(res.message);$('pasteStatus').textContent=res.message;return;}
         toast(pasteKind==='lessons'
           ? '형식을 찾지 못했습니다. [ 로 시작해 ] 로 끝나는 부분만 붙여 넣어 보세요.'
           : '형식을 찾지 못했습니다. { 로 시작해 } 로 끝나는 부분만 붙여 넣어 보세요.');
         return;
+      }
+      if(res.partial){
+        var msg=res.message+(res.missing.length?'\n미반영 항목: '+res.missing.join(', '):'');
+        $('pasteStatus').textContent=msg;
+        if(!confirm(msg+'\n\n읽힌 항목만 반영할까요? 나머지 작성 내용은 유지됩니다.'))return;
       }
       if(pasteKind==='lessons') applyLessonRows(res.parsed);
       else applyParsed(pasteStageId,res.parsed);
       closeMask('maskPrompt');
     })
     .withFailureHandler(function(e){ toast('오류: '+e.message); })
-    .api_parsePasted({ text:text, kind:pasteKind });
+    .api_parsePasted({ text:text, kind:pasteKind, stageId:pasteStageId });
 }
 
 /* ---------------- 설정 ---------------- */

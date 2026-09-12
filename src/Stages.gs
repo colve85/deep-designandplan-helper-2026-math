@@ -33,6 +33,7 @@ var STAGES = [
         hint: '오개념은 목표가 되고, 학생이 넘어야 할 허들은 곧 질문이 됩니다.', rows: 3 },
       { key: 'curriculumCoreIdea', label: '교육과정 핵심 아이디어 원문', hint: '교육과정 문장을 그대로 옮기고 재구성 핵심 아이디어와 구분합니다.', rows: 4 },
       { key: 'achievementStandards', label: '성취기준·성취기준 해설', hint: '코드와 원문, 해설의 핵심을 함께 기록합니다.', rows: 5 },
+      { key: 'achievementLevels', label: '성취기준별 성취수준 (공식 A~E)', hint: '공식 성취수준 자료와 연결된 진술입니다. 연결되지 않은 과목은 공식 문서 확인 필요로 표시합니다.', rows: 8 },
       { key: 'standardConsiderations', label: '성취기준 적용 시 고려 사항', hint: '교구·공학 도구·정당화 방법·평가 유의점을 적습니다.', rows: 4 },
       { key: 'knowledgeUnderstanding', label: '내용 요소 — 지식·이해', hint: '학생이 알아야 할 개념·용어·관계를 적습니다.', rows: 3 },
       { key: 'processFunction', label: '내용 요소 — 과정·기능', hint: '학생이 수행할 표현·탐구·정당화 기능을 적습니다.', rows: 3 },

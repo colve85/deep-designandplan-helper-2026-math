@@ -7,7 +7,7 @@
  **********************************************************************/
 
 var APP_TITLE   = '깊이 있는 수업·평가 설계 도우미';
-var APP_VERSION = '2.7.4';
+var APP_VERSION = '2.7.6';
 var DEFAULT_MODEL = 'gemini-2.5-flash';
 function normalizeGeminiModel_(value) { var model=String(value||DEFAULT_MODEL).trim().replace(/^models\//,''); return model||DEFAULT_MODEL; }
 
@@ -100,6 +100,7 @@ function workbookCompetency_(u) {
 function decorateWorkbookFields_(u) {
   u.ex=u.ex||{};
   var ex=u.ex, lessons=u.lessons||[];
+  narrowOfficialUnit_(u);
   var knowledge=(u.officialContentElements||[]).join('\n') || extractContentCategory_(ex.categories,'knowledge') || extractContentCategory_(ex.canDo,'knowledge');
   var process=(u.officialProcess||[]).join('\n') || extractContentCategory_(ex.categories,'process') || extractContentCategory_(ex.canDo,'process');
   var values=(u.officialValues||[]).join('\n') || extractContentCategory_(ex.categories,'values') || extractContentCategory_(ex.canDo,'values');
@@ -115,6 +116,7 @@ function decorateWorkbookFields_(u) {
   // Generated examples are recomputed from source fields, never from old generated values.
   ex.curriculumCoreIdea=(u.officialCoreIdeas||[]).join('\n') || '[원문 확인 필요] 이 예시에는 교육과정 핵심 아이디어 원문이 별도로 연결되어 있지 않습니다. 해당 과목 교육과정의 내용 체계에서 확인하여 입력하세요.';
   ex.achievementStandards=std+'\n[해설 확인 상태] 이 단원의 성취기준 해설 원문은 별도로 수록되어 있지 않습니다. 공식 문서의 해당 코드 해설과 대조해야 합니다.';
+  ex.achievementLevels=achievementLevelsText_(u.standards||[]);
   ex.standardConsiderations='[교사 설계 참고 — 교육과정 적용 시 고려 사항 원문 아님]\n'+(ex.support||'표·식·그림을 비교하며 학생의 설명을 확인한다.')+'\n평가에서는 '+(last.evidence||ex.evidence);
   ex.knowledgeUnderstanding=knowledge;
   ex.processFunction=process;
@@ -143,6 +145,31 @@ function decorateWorkbookFields_(u) {
   ex.assessmentFeedbackPlan=lessons.map(function(l,i){return (l.periods||String(i+1)+'차시')+' ['+(/수행/.test(l.phase)?'총괄':/발견/.test(l.phase)?'진단·형성':'형성')+'평가]\n증거: '+l.evidence+'\n피드백: 「'+l.goal+'」에 대한 근거를 묻고 수정 전후 설명을 비교한다.';}).join('\n\n');
   ex.reflectionPrompts='의미: '+keyConcept+'을 배우기 전과 후에 무엇을 다르게 설명할 수 있는가?\n탐구: 「'+u.name+'」의 결론을 뒷받침하는 가장 강한 근거는 무엇인가?\n비교: 친구의 풀이와 나의 풀이가 다른 까닭은 무엇인가?\n한계: 조건이 달라지면 어떤 설명을 수정해야 하는가?\n성장: 피드백을 반영해 바꾼 부분과 다음에 탐구할 질문은 무엇인가?';
   ex.learningEnvironment='도구·자료: '+lessons.map(function(l){return l.tool;}).filter(function(v,i,a){return v&&a.indexOf(v)===i;}).join(', ')+'\n지원: '+ex.support;
+}
+
+function narrowOfficialUnit_(u) {
+  if(!u||!/^official-/.test(String(u.id)))return;
+  var m=String(u.id).match(/-(\d+)-(\d+)$/);if(!m)return;
+  var areaNo=Number(m[2])+1;
+  var re=new RegExp('-0?'+areaNo+'-|[^0-9]0?'+areaNo+'-\\d{2}$');
+  if(Array.isArray(u.standards))u.standards=u.standards.filter(function(s){return re.test(String(s.code));});
+  if(Array.isArray(u.officialCoreIdeas)&&u.officialCoreIdeas.length>areaNo-1)u.officialCoreIdeas=[u.officialCoreIdeas[areaNo-1]];
+}
+function cleanAchievementLevel_(value) {
+  var text=String(value||'').replace(/\s+(?:평가 과제|채점 기준|예시 평가 도구|성취기준 성취수준|개발 방향 및 활용)[\s\S]*$/,'').trim();
+  // HWP extraction can expose drawing placeholders or answer-key fragments.
+  if(/敤敱|漠杳|氠瑢|O A1 B1/.test(text))return '';
+  return text;
+}
+function achievementLevelsText_(standards) {
+  var out=['[공식 성취수준 자료 대조]'];
+  (standards||[]).forEach(function(s){
+    var row=(typeof ACHIEVEMENT_LEVELS!=='undefined'&&ACHIEVEMENT_LEVELS[s.code])||null;
+    out.push('['+s.code+'] '+s.text);
+    if(row&&row.levels){var added=false;['A','B','C','D','E'].forEach(function(k){var level=cleanAchievementLevel_(row.levels[k]);if(level){out.push(k+' — '+level);added=true;}});if(!added)out.push('공식 성취수준 원문 연결 필요 — 추출된 원문을 판독할 수 없어 공식 자료에서 재확인하세요.');}
+    else out.push('공식 성취수준 원문 연결 필요 — 교육부·교육과정평가원 성취수준 자료에서 해당 코드를 확인하세요.');
+  });
+  return out.join('\n');
 }
 
 function getSubjects_() {

@@ -243,7 +243,7 @@ function callGemini_(prompt, wantArray, req) {
       muteHttpExceptions: true,
       payload: JSON.stringify({
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.8, maxOutputTokens: 3072 }
+        generationConfig: { temperature: 0.8, maxOutputTokens: 8192 }
       })
     });
   } catch (err) {
@@ -355,8 +355,19 @@ function looseExtract_(body, wantArray) {
 function api_parsePasted(payload) {
   var wantArray = payload && payload.kind === 'lessons';
   var text = (payload && payload.text) || '';
+  // 전체 JSON을 문자열로 다시 감싼 응답도 처리한다.
+  try { var decoded=JSON.parse(text); if(typeof decoded==='string')text=decoded; } catch(e) {}
   var obj = parseModelJson_(text, wantArray);
-  return { ok: !!obj, parsed: obj };
+  if(wantArray)return {ok:!!obj,parsed:obj,message:obj?'':'차시 응답의 처음 [부터 마지막 ]까지 전체를 복사해 주세요. 응답이 중간에 끝났다면 AI에 이어서 완성해 달라고 요청하세요.'};
+  var stage=stageById_(payload.stageId),fields=stage?stage.fields:STAGES.reduce(function(a,s){return a.concat(s.fields);},[]);
+  var recovered=false;
+  if(!obj){obj=looseExtract_(text,false);recovered=!!obj;}
+  var clean={},missing=[];
+  fields.forEach(function(f){if(obj&&typeof obj[f.key]==='string'&&obj[f.key].trim())clean[f.key]=obj[f.key];else missing.push(f.label);});
+  var count=Object.keys(clean).length;
+  var whole=false;try{var candidate=sliceJson_(text,false);whole=!!candidate&&!!JSON.parse(candidate);}catch(e){}
+  var partial=count>0&&(recovered||!whole||!!(stage&&missing.length));
+  return {ok:count>0,parsed:clean,partial:partial,count:count,missing:stage?missing:[],message:count?(partial?'응답이 잘렸거나 일부 항목의 형식이 올바르지 않습니다. 읽을 수 있는 '+count+'개 항목만 반영할 수 있습니다.':''):'현재 단계에 맞는 항목을 읽지 못했습니다. AI 답변 전체를 복사했는지 확인하세요. 답변이 중간에 끝났다면 마지막 중괄호까지 완성해 달라고 요청하세요.'};
 }
 
 /* ------------------------------------------------------------------ */
