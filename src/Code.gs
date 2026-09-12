@@ -7,8 +7,9 @@
  **********************************************************************/
 
 var APP_TITLE   = '깊이 있는 수업·평가 설계 도우미';
-var APP_VERSION = '2.7.2';
+var APP_VERSION = '2.7.3';
 var DEFAULT_MODEL = 'gemini-2.5-flash';
+function normalizeGeminiModel_(value) { var model=String(value||DEFAULT_MODEL).trim().replace(/^models\//,''); return model||DEFAULT_MODEL; }
 
 /** 한글 문서를 드라이브에 저장할 때 사용할 폴더 이름 */
 var DRIVE_FOLDER = '수업설계_한글문서';
