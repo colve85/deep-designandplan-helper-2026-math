@@ -236,7 +236,12 @@ function isStageFilled(id){
   for(var i=0;i<st.fields.length;i++){ var v=d[st.fields[i].key]; if(v&&String(v).trim()) return true; }
   return false;
 }
+function migrateCoreIdea(){
+  var d=state.stages[0];
+  if(d&&d.bigIdea&&!d.reconstructedCoreIdea)d.reconstructedCoreIdea=d.bigIdea;
+}
 function render(){
+  migrateCoreIdea();
   renderSteps();
   var host=$('stageHost'); host.innerHTML='';
   var list=(state.mode==='training')?[state.current]:[0,1,2,3];
@@ -245,6 +250,7 @@ function render(){
   $('navRow').style.display=(state.mode==='training')?'flex':'none';
   $('btnPrev').disabled=(state.current===0);
   $('btnNext').disabled=(state.current===3);
+  $('btnNext').style.display=(state.current===3)?'none':'';
 }
 function renderSteps(){
   var box=$('steps'); box.innerHTML='';
@@ -498,6 +504,7 @@ function loadAllLessons(){
 
 /* ---------------- 예시 채우기 ---------------- */
 function fillExample(stageId, onlyEmpty){
+  if(onlyEmpty)migrateCoreIdea();
   var u=currentUnit();
   if(!u){ toast('먼저 단원을 선택하세요.'); return; }
   var ids=(stageId===null)?[0,1,2,3]:[stageId], missing=[], count=0;
@@ -780,6 +787,7 @@ function showFramework(){
 
 /* ---------------- 미리보기 ---------------- */
 function designPayload(){
+  migrateCoreIdea();
   var u=currentUnit();
   return {
     meta: {

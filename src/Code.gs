@@ -7,7 +7,7 @@
  **********************************************************************/
 
 var APP_TITLE   = '깊이 있는 수업·평가 설계 도우미';
-var APP_VERSION = '2.7.3';
+var APP_VERSION = '2.7.4';
 var DEFAULT_MODEL = 'gemini-2.5-flash';
 function normalizeGeminiModel_(value) { var model=String(value||DEFAULT_MODEL).trim().replace(/^models\//,''); return model||DEFAULT_MODEL; }
 
@@ -73,6 +73,30 @@ function workbookQuestions_(text, kind) {
   return out.join('\n');
 }
 
+/** 범주 이름은 한 번만 표시하고, 각 범주의 원래 내용은 모두 보존한다. */
+function groupWorkbookCategories_(text) {
+  var groups={'지식·이해':[],'과정·기능':[],'가치·태도':[]}, before=[],active='';
+  String(text||'').split(/\r?\n/).forEach(function(line){
+    var tail=line.match(/\s*\[(지식·이해|과정·기능|가치·태도)\]\s*$/);
+    if(tail&&line.slice(0,tail.index).trim()){
+      active=tail[1];groups[active].push(line.slice(0,tail.index).replace(/^\s*(?:[①-⑳•-]|\d+[.)])\s*/,''));return;
+    }
+    var m=line.match(/^\s*(?:\d+[.)]\s*)?(?:공식\s*)?\[?(지식·이해|과정·기능|가치·태도)\]?\s*[:：]?\s*/);
+    if(m){active=m[1];line=line.slice(m[0].length);}
+    if(line.trim())(active?groups[active]:before).push(line.replace(/^\s*[•-]\s*/,''));
+  });
+  if(!active)return text;
+  return before.concat(Object.keys(groups).filter(function(k){return groups[k].length;}).map(function(k){return '['+k+']\n'+groups[k].map(function(v){return '• '+v;}).join('\n');})).join('\n\n');
+}
+/** 총론의 인간상 명칭과 수업의 연결은 교사 제안이며 공식 원문 인용이 아니다. */
+function workbookCompetency_(u) {
+  var lessons=u.lessons||[],all=lessons.map(function(l){return (l.activity||'')+' '+(l.goal||'');}).join(' ');
+  var creative=/설계|모형|모델|최적|예측/.test(all),cooperate=/동료|토론|협력|모둠|서로/.test(all);
+  var human=cooperate?'더불어 사는 사람':creative?'창의적인 사람':'자기주도적인 사람';
+  var core=cooperate?'협력적 소통 역량':creative?'창의적 사고 역량':'자기관리 역량';
+  var action=cooperate?'서로 다른 풀이의 근거를 듣고 공동의 설명을 수정한다.':creative?'조건을 바꾸어 해결 방법을 제안하고 타당성을 검토한다.':'해결 계획을 세우고 자신의 풀이와 오류를 점검한다.';
+  return '[단원 연계 제안 — 총론의 인간상·역량 명칭을 선택하여 적용]\n인간상: '+human+' — '+action+'\n핵심역량: '+core+' — 위 행동을 탐구와 성찰에서 확인한다.\n수학 교과 역량: 문제해결·추론'+(cooperate?'·의사소통':'')+'\n단원에서 관찰할 수행: '+((lessons[0]||{}).goal||u.name+'의 핵심 개념과 풀이의 근거를 설명한다.');
+}
 function decorateWorkbookFields_(u) {
   u.ex=u.ex||{};
   var ex=u.ex, lessons=u.lessons||[];
@@ -84,9 +108,12 @@ function decorateWorkbookFields_(u) {
   var keyConcept=concepts.slice(0,3).join(', ') || u.area;
   var std=(u.standards||[]).map(function(s){return '['+s.code+'] '+s.text;}).join('\n');
   var first=lessons[0]||{}, last=lessons[lessons.length-1]||{};
+  ex.canDo=groupWorkbookCategories_(ex.canDo);
+  ex.elements=groupWorkbookCategories_(ex.elements);
+  ex.competency=workbookCompetency_(u);
   var basis=ex.understand||ex.bigIdea;
   // Generated examples are recomputed from source fields, never from old generated values.
-  ex.curriculumCoreIdea=(u.officialCoreIdeas||[]).join('\n') || '[출처 확인 필요] 이 예시에는 교육과정 핵심 아이디어 원문이 별도로 연결되어 있지 않습니다. 아래 문장은 교사 재구성 참고 문장입니다.\n'+ex.bigIdea;
+  ex.curriculumCoreIdea=(u.officialCoreIdeas||[]).join('\n') || '[원문 확인 필요] 이 예시에는 교육과정 핵심 아이디어 원문이 별도로 연결되어 있지 않습니다. 해당 과목 교육과정의 내용 체계에서 확인하여 입력하세요.';
   ex.achievementStandards=std+'\n[해설 확인 상태] 이 단원의 성취기준 해설 원문은 별도로 수록되어 있지 않습니다. 공식 문서의 해당 코드 해설과 대조해야 합니다.';
   ex.standardConsiderations='[교사 설계 참고 — 교육과정 적용 시 고려 사항 원문 아님]\n'+(ex.support||'표·식·그림을 비교하며 학생의 설명을 확인한다.')+'\n평가에서는 '+(last.evidence||ex.evidence);
   ex.knowledgeUnderstanding=knowledge;

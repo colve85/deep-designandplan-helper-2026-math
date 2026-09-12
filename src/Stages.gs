@@ -23,8 +23,6 @@ var STAGES = [
            '내용 체계의 세 범주로 분해한 뒤 이 단원을 대표하는 핵심 아이디어를 세웁니다.',
     mapping: '연수 1단계 · 바라는 결과 확인 (3~4차시)  ↔  교육부 4단계 모델 ① 교육과정 분석하기',
     fields: [
-      { key: 'bigIdea',       label: '핵심 아이디어',
-        hint: '축자 채택(교육과정 문장 그대로) 또는 생성(세 범주 분해 → 관계 찾기 → 일반화) 중 하나로.', rows: 3 },
       { key: 'categories',    label: '내용 체계 세 범주 분석',
         hint: '지식·이해 / 과정·기능 / 가치·태도로 나누어 적습니다.', rows: 4 },
       { key: 'competency',    label: '인간상 · 핵심역량 · 교과 역량',
@@ -41,7 +39,7 @@ var STAGES = [
       { key: 'valuesAttitudes', label: '내용 요소 — 가치·태도', hint: '수학적 태도와 학습을 통해 기를 관점을 적습니다.', rows: 3 },
       { key: 'reconstructionTitle', label: '재구성 단원 제목', hint: '핵심 아이디어와 주요 수행을 암시하는 제목으로 씁니다.', rows: 2 },
       { key: 'conceptLens', label: '개념 렌즈·주도 개념', hint: '예: 형식(형태), 논리 / 동치성, 타당성 / 패턴.', rows: 2 },
-      { key: 'reconstructedCoreIdea', label: '재구성 핵심 아이디어', hint: '핵심 개념 사이의 관계와 전이 가능성을 일반화합니다.', rows: 5 },
+      { key: 'reconstructedCoreIdea', label: '단원 핵심 아이디어 (채택·재구성)', hint: '앞의 교육과정 원문을 채택하거나, 세 범주의 관계를 일반화하여 이 단원의 핵심 아이디어를 작성합니다.', rows: 5 },
       { key: 'transfer', label: '전이 맥락·교수학습 방향', hint: '다른 단원·교과·실생활로 확장할 맥락을 적습니다.', rows: 3 }
     ],
     checklist: [

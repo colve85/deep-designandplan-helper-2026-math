@@ -143,3 +143,19 @@ assert(node('checkHost').innerHTML.includes('단원 그물'));
 assert(node('toast').textContent.includes('누락된 항목'));
 testUnit.ex.strands=oldExample;
 console.log('전체 예시 검증 통과: '+checkedFields+'개 필드, 6증거·3수준·스트랜드·저장·문서·옛 초안 빈칸 보완');
+assert(!c.STAGES[0].fields.some(f=>f.key==='bigIdea'));
+assert(c.STAGES[0].fields.some(f=>f.key==='curriculumCoreIdea'));
+assert(c.STAGES[0].fields.some(f=>f.key==='reconstructedCoreIdea'));
+for(const u of c.getAllUnits_()){
+  for(const key of ['canDo','elements'])for(const label of ['지식·이해','과정·기능','가치·태도']){
+    assert(u.ex[key].split('['+label+']').length-1<=1,u.id+' repeated '+key+' '+label);
+  }
+  assert(/인간상: (자기주도적인 사람|창의적인 사람|교양 있는 사람|더불어 사는 사람)/.test(u.ex.competency));
+  assert(u.ex.competency.includes('핵심역량:'));
+  assert(u.ex.competency.includes('수학 교과 역량:'));
+}
+ui.state.stages={0:{bigIdea:'이전 교사 작성 핵심 아이디어'}};ui.migrateCoreIdea();
+assert.equal(ui.state.stages[0].reconstructedCoreIdea,'이전 교사 작성 핵심 아이디어');
+ui.state.stages[0].reconstructedCoreIdea='수정한 핵심 아이디어';ui.migrateCoreIdea();
+assert.equal(ui.state.stages[0].reconstructedCoreIdea,'수정한 핵심 아이디어');
+console.log('2.7.4: 인간상 포함·범주명 반복 제거·핵심 아이디어 이전 입력 보존 PASS');
