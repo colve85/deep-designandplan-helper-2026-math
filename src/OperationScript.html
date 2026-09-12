@@ -86,10 +86,12 @@ function opMergeImported(p, imported){
  // 모델이 sections 없이 항목을 최상위에 놓거나, 표를 단일 객체로 반환한 경우도 수용한다.
  if(imported.plan&&typeof imported.plan==='object')imported=imported.plan;
  var source=imported.sections||(imported.data&&imported.data.sections)||imported;
- if(imported.meta)Object.keys(p.meta).forEach(function(k){if(imported.meta[k]&&(!p.meta[k]||k==='school'||k==='teacher'))p.meta[k]=String(imported.meta[k]);});
+ // 학년도·학기·학점·학급·시수 관련 값은 새 학교/학기에 맞지 않을 수 있어 가져오지 않는다.
+ var manualMeta={year:1,semester:1,credits:1,classes:1};
+ if(imported.meta)Object.keys(p.meta).forEach(function(k){if(!manualMeta[k]&&imported.meta[k]&&(!p.meta[k]||k==='school'||k==='teacher'))p.meta[k]=String(imported.meta[k]);});
  BOOT.operationSchema.sections.forEach(function(s){
   if(s.key==='schedule'||source[s.key]===undefined)return;
-  if(s.cols){var rows=source[s.key];if(rows&&typeof rows==='object'&&!Array.isArray(rows))rows=[rows];if(Array.isArray(rows)&&rows.length){var clean=rows.filter(function(r){return r&&Object.keys(r).some(function(k){return String(r[k]||'').trim();});});if(clean.length)p.sections[s.key]=clean;}}
+  if(s.cols){var rows=source[s.key];if(rows&&typeof rows==='object'&&!Array.isArray(rows))rows=[rows];if(Array.isArray(rows)&&rows.length){var clean=rows.filter(function(r){return r&&Object.keys(r).some(function(k){return String(r[k]||'').trim();});}).map(function(r){var n={};s.cols.forEach(function(c){n[c[0]]=String(r[c[0]]==null?'':r[c[0]]);});['time','hours','cumulative','periods','prevention','supplement','additional','recognition'].forEach(function(k){if(k in n)n[k]='';});return n;});if(clean.length)p.sections[s.key]=clean;}}
   else if(String(source[s.key]||'').trim())p.sections[s.key]=String(source[s.key]);
  });
 }

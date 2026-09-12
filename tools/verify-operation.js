@@ -27,9 +27,13 @@ for (const u of c.getAllUnits_()) {
 }
 // PDF 모델이 표를 단일 객체 또는 sections 밖에 반환해도 병합한다.
 let importedPlan=ui.opEmpty();
-ui.opMergeImported(importedPlan,{sections:{purpose:'평가 목적',policy:'학교 규정 확인',levels:{standard:'[코드] 기준',level:'A',description:'설명'}}});
+ui.opMergeImported(importedPlan,{meta:{year:'2024',school:'이전 학교'},sections:{purpose:'평가 목적',policy:'학교 규정 확인',levels:{standard:'[코드] 기준',level:'A',description:'설명'},prevention:{time:'3월',hours:'4',unit:'단원',method:'지도'}}});
 assert.equal(importedPlan.sections.purpose,'평가 목적');
 assert.equal(importedPlan.sections.levels.length,1);
+assert.equal(importedPlan.meta.year,'');
+assert.equal(importedPlan.meta.school,'이전 학교');
+assert.equal(importedPlan.sections.prevention[0].time,'');
+assert.equal(importedPlan.sections.prevention[0].hours,'');
 ui.state.stages[0].reconstructionTitle='직접 고친 단원 제목';
 ui.state.stages[2].task='직접 고친 수행과제';
 ui.state.operationPlans=[ui.opEmpty()];ui.opActive=0;ui.opAppend();
