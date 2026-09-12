@@ -24,6 +24,7 @@ for (const u of c.getAllUnits_()) {
   for(const row of p.sections.schedule){
     for(const k of ['time','hours','cumulative'])assert.equal(row[k],'');
     for(const k of ['unit','standards','elements','methods'])assert(row[k]&&!row[k].includes('undefined'),u.id+' '+k);
+    assert(row.methods.includes('수업-평가 연계의 주안점'));
   }
 }
 const calculus= c.api_bootstrap().units.filter(u=>u.subject==='미적분Ⅰ');
@@ -32,6 +33,7 @@ ui.state.unitId='official-06-00';ui.state.operationPlans=[ui.opEmpty()];ui.opAct
 const coursePlan=ui.opCurrent(), joined=coursePlan.sections.schedule.map(r=>r.standards).join('\n');
 assert.equal(coursePlan.sections.schedule.length,17);
 for(const u of calculus)for(const s of u.standards)assert(joined.includes('['+s.code+']'),s.code+' 과목 전체 기준 누락');
+assert(coursePlan.sections.schedule.some(r=>r.unit.includes('함수의 극한과 연속')));
 // 이전 버전의 별도 섹션을 가진 저장 계획은 Ⅰ 표만 남긴다.
 const oldPlan=ui.opEmpty();oldPlan.sections={schedule:[],purpose:'옛 내용',levels:[{standard:'옛 기준'}]};oldPlan.meta.subject='미적분Ⅰ';ui.state.operationPlans=[oldPlan];ui.opActive=0;ui.opMigratePlan_(oldPlan);
 assert.deepEqual(Object.keys(ui.opCurrent().sections),['schedule']);assert.equal(ui.opCurrent().sections.schedule.length,17);

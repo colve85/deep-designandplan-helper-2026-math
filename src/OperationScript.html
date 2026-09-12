@@ -17,7 +17,8 @@ function opCourseRows_(subject){
  if(!units.length)return [];
  var out=[],n=17;
  for(var i=0;i<n;i++){var start=Math.floor(i*all.length/n),end=Math.floor((i+1)*all.length/n),subset=all.slice(start,end);if(!subset.length&&all.length)subset=[all[Math.min(all.length-1,start)]];var card=cards[Math.min(cards.length-1,Math.floor(i*cards.length/n))],u=card.u,l=card.l;
-  out.push({time:'',hours:'',cumulative:'',unit:(subset.map(function(x){return x.u.area+' / '+x.u.name;}).filter(function(v,j,a){return a.indexOf(v)===j;}).join('\n')||u.area+' / '+u.name),standards:subset.map(function(x){return '['+x.s.code+'] '+x.s.text;}).join('\n'),elements:l.goal||l.element||u.ex.elements,methods:'수업: '+(l.activity||'개념 탐구와 적용')+'\n평가 증거: '+(l.evidence||'학생 설명·풀이·성찰')+'\n연계 주안점: '+(l.goal||'개념을 새로운 사례에 적용한다.'),notes:'학교 행사·시험 기간에 맞게 시기와 차시를 조정하세요.'});
+  var officialUnits=subset.map(function(x){return x.u.officialName||x.u.area||x.u.name;}).filter(function(v,j,a){return a.indexOf(v)===j;}),content=subset.map(function(x){return (x.u.officialContentElements||[]).join(', ');}).filter(function(v,j,a){return v&&a.indexOf(v)===j;}).join(' · ')||l.element||u.area||u.name;
+  out.push({time:'',hours:'',cumulative:'',unit:(officialUnits.join('\n')||u.officialName||u.area||u.name),standards:subset.map(function(x){return '['+x.s.code+'] '+x.s.text;}).join('\n'),elements:content+'\n성취기준에 따른 개념 이해·과정 수행·수학적 의사소통',methods:'수업: '+(l.activity||'교육과정 내용 요소를 탐구하고 다양한 표현으로 설명한다.')+'\n평가: '+(l.evidence||'교육과정 성취기준에 근거하여 개념 이해, 문제 해결 과정, 설명 및 정당화를 확인한다.')+'\n수업-평가 연계의 주안점: 수업에서 다룬 내용 요소와 성취기준을 평가 요소에 직접 연결하고, 학생의 풀이·설명·성찰 자료를 근거로 피드백한다.',notes:'학교 행사·시험 기간에 맞게 시기와 차시를 조정하세요.'});
  }
  return out;
 }
