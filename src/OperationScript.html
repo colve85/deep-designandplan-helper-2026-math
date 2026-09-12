@@ -74,11 +74,11 @@ function opMergeImported(p, imported){
 }
 function opPdfFill(file){
  if(!file)return; var reader=new FileReader(); reader.onload=function(){
-  var data=String(reader.result).split(',')[1]||''; $('opPdf').disabled=true; $('opStatus').textContent='지난 학기 PDF를 분석하고 있습니다. 잠시 기다려 주세요.';
+  var data=String(reader.result).split(',')[1]||''; $('opPdfTop').disabled=true; $('opStatus').textContent='지난 학기 PDF를 분석하고 있습니다. 잠시 기다려 주세요.';
   var req={pdfBase64:data,filename:file.name,plan:opCurrent(),apiKey:(typeof localSettings!=='undefined'?localSettings.apiKey:''),model:(typeof localSettings!=='undefined'?localSettings.model:'')};
-  var done=function(r){$('opPdf').disabled=false;if(!r||!r.ok){toast((r&&r.message)||'PDF 분석에 실패했습니다.');return;}opMergeImported(opCurrent(),r.parsed);opCurrent().sourcePdf=file.name;opRender();save();$('opStatus').textContent='PDF 초안을 반영했습니다. 교수학습-평가 계획은 유지하고 나머지 항목만 갱신했습니다.';};
+  var done=function(r){$('opPdfTop').disabled=false;if(!r||!r.ok){toast((r&&r.message)||'PDF 분석에 실패했습니다.');return;}opMergeImported(opCurrent(),r.parsed);opCurrent().sourcePdf=file.name;opRender();save();$('opStatus').textContent='PDF 초안을 반영했습니다. 교수학습-평가 계획은 유지하고 나머지 항목만 갱신했습니다.';};
   if(typeof google!=='undefined'&&google.script&&google.script.run)google.script.run.withSuccessHandler(done).withFailureHandler(function(e){$('opPdf').disabled=false;toast('PDF 분석 실패: '+e.message);}).api_extractOperationPlan(req);
-  else fetch('/api',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fn:'api_extractOperationPlan',args:[req]})}).then(function(x){return x.json();}).then(function(x){done(x.result||x);}).catch(function(e){$('opPdf').disabled=false;toast('PDF 분석 실패: '+e.message);});
+  else fetch('/api',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fn:'api_extractOperationPlan',args:[req]})}).then(function(x){return x.json();}).then(function(x){done(x.result||x);}).catch(function(e){$('opPdfTop').disabled=false;toast('PDF 분석 실패: '+e.message);});
  };reader.readAsDataURL(file);
 }
 function opPrompt(){
@@ -97,7 +97,7 @@ function opPreview(){
 }
 window.addEventListener('DOMContentLoaded',function(){
  $('btnOperation').onclick=function(){if(!BOOT){toast('자료를 불러오는 중입니다.');return;}if(!opPlans().length)opAdd();else opRender();openMask('maskOperation');};
- $('opSelect').onchange=function(){opActive=Number(this.value);opRender();};$('opNew').onclick=opAdd;$('opCopy').onclick=opCopy;$('opAppend').onclick=opAppend;$('opPdf').onclick=function(){$('opPdfFile').click();};$('opPdfFile').onchange=function(){opPdfFill(this.files[0]);this.value='';};$('opPrompt').onclick=opPrompt;$('opCheck').onclick=opCheck;$('opJson').onclick=opExport;$('opPreview').onclick=opPreview;$('opDownload').onclick=opDownload;
+ $('opSelect').onchange=function(){opActive=Number(this.value);opRender();};$('opNew').onclick=opAdd;$('opCopy').onclick=opCopy;$('opAppend').onclick=opAppend;$('opPdfTop').onclick=function(){$('opPdfFileTop').click();};$('opPdfFileTop').onchange=function(){opPdfFill(this.files[0]);this.value='';};$('opPrompt').onclick=opPrompt;$('opCheck').onclick=opCheck;$('opJson').onclick=opExport;$('opPreview').onclick=opPreview;$('opDownload').onclick=opDownload;
  $('opImport').onclick=function(){$('opImportFile').click();};$('opImportFile').onchange=function(){var file=this.files[0];if(!file)return;var r=new FileReader();r.onload=function(){try{opPlans().push(opNormalize(JSON.parse(r.result)));opActive=opPlans().length-1;opRender();save();}catch(e){toast('불러오기 실패: '+e.message);}};r.readAsText(file);this.value='';};
 });
 </script>
