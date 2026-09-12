@@ -1,0 +1,80 @@
+<script>
+var opActive=0;
+function opPlans(){if(!Array.isArray(state.operationPlans))state.operationPlans=[];return state.operationPlans;}
+function opCurrent(){return opPlans()[opActive];}
+function opEmpty(){
+ var p={meta:{},sections:{},sourceUnits:[]};
+ BOOT.operationSchema.meta.forEach(function(c){p.meta[c[0]]='';});
+ BOOT.operationSchema.sections.forEach(function(s){p.sections[s.key]=s.cols?[]:'';});
+ var u=currentUnit();p.meta.school=state.meta.school||'';p.meta.teacher=state.meta.teacher||'';p.meta.subject=u?u.subject:'';p.meta.grade=state.meta.grade||'';
+ return p;
+}
+function opAdd(){opPlans().push(opEmpty());opActive=opPlans().length-1;opRender();save();}
+function opCopy(){
+ var p=JSON.parse(JSON.stringify(opCurrent()));p.meta.year='';p.meta.semester='';
+ BOOT.operationSchema.sections.forEach(function(s){if(s.cols)(p.sections[s.key]||[]).forEach(function(r){['time','hours','cumulative','periods','prevention','supplement','additional','recognition'].forEach(function(k){if(k in r)r[k]='';});});});
+ opPlans().push(p);opActive=opPlans().length-1;opRender();save();toast('복사했습니다. 학년도·학기·일정·시수를 직접 입력하세요.');
+}
+function opRender(){
+ if(opActive>=opPlans().length)opActive=0;
+ var p=opCurrent(),schema=BOOT.operationSchema;if(!p)return;
+ $('opSelect').innerHTML=opPlans().map(function(x,i){return '<option value="'+i+'"'+(i===opActive?' selected':'')+'>'+esc((x.meta.year||'학년도 미입력')+' / '+(x.meta.semester||'학기 미입력')+' / '+(x.meta.subject||'과목 미입력')+' ('+(i+1)+')')+'</option>';}).join('');
+ var html='<div class="op-meta">'+schema.meta.map(function(c){return '<label>'+esc(c[1])+'<input data-om="'+c[0]+'" value="'+esc(p.meta[c[0]])+'"></label>';}).join('')+'</div>';
+ schema.sections.forEach(function(s){
+  html+='<details'+(s.key==='schedule'?' open':'')+'><summary>'+esc(s.title)+'</summary>';
+  if(!s.cols)html+='<textarea rows="5" data-os="'+s.key+'" aria-label="'+esc(s.title)+'">'+esc(p.sections[s.key])+'</textarea>';
+  else{
+   html+='<div class="op-scroll"><table class="op-table"><thead><tr>'+s.cols.map(function(c){return '<th>'+esc(c[1])+'</th>';}).join('')+'<th>행 편집</th></tr></thead><tbody>';
+   (p.sections[s.key]||[]).forEach(function(r,i){html+='<tr>'+s.cols.map(function(c){return '<td'+(/^(time|hours|cumulative|ratio|max|base|score)$/.test(c[0])?' class="op-short"':'')+'><textarea aria-label="'+esc(s.title+' '+(i+1)+'행 '+c[1])+'" data-ot="'+s.key+'" data-or="'+i+'" data-ok="'+c[0]+'">'+esc(r[c[0]])+'</textarea></td>';}).join('')+'<td><button class="btn sm" data-ou="'+s.key+'" data-or="'+i+'">위로</button><button class="btn sm" data-od="'+s.key+'" data-or="'+i+'">삭제</button></td></tr>';});
+   html+='</tbody></table></div><button class="btn" data-oa="'+s.key+'">+ 행 추가</button>';
+  }html+='</details>';
+ });$('opEditor').innerHTML=html;
+ $('opEditor').oninput=function(e){var t=e.target;if(t.hasAttribute('data-om'))p.meta[t.dataset.om]=t.value;else if(t.hasAttribute('data-os'))p.sections[t.dataset.os]=t.value;else if(t.hasAttribute('data-ot'))p.sections[t.dataset.ot][Number(t.dataset.or)][t.dataset.ok]=t.value;save();};
+ $('opEditor').onclick=function(e){var t=e.target;if(t.dataset.oa){p.sections[t.dataset.oa].push({});}else if(t.dataset.od){p.sections[t.dataset.od].splice(Number(t.dataset.or),1);}else if(t.dataset.ou){var i=Number(t.dataset.or),a=p.sections[t.dataset.ou];if(i>0){var x=a[i-1];a[i-1]=a[i];a[i]=x;}}else return;var details=t.closest('details'),key=details&&details.querySelector('[data-oa]');key=key&&key.dataset.oa;opRender();if(key){var add=$('opEditor').querySelector('[data-oa="'+key+'"]');if(add)add.closest('details').open=true;}save();};
+}
+function opAppend(){
+ var p=opCurrent(),u=currentUnit();if(!u){toast('단원을 먼저 선택하세요.');return;}
+ if(p.meta.subject&&p.meta.subject!==u.subject){toast('현재 단원과 운영 계획의 과목이 다릅니다. 새 운영 계획을 만드세요.');return;}
+ if((p.sourceUnits||[]).indexOf(u.id)>=0&&!confirm('이미 추가한 단원입니다. 다시 추가할까요?'))return;
+ var d=state.stages||{},s0=d[0]||{},s2=d[2]||{},s3=d[3]||{},rows=state.lessons.length?state.lessons:u.lessons;
+ var standards=selectedStandards(u).map(function(s){return '['+s.code+'] '+s.text;}).join('\n');
+ (rows||[]).forEach(function(l){p.sections.schedule.push({time:'',hours:'',cumulative:'',unit:u.area+' / '+(s0.reconstructionTitle||u.name)+'\n'+(l.element||''),standards:standards,elements:l.goal||s2.elements||u.ex.elements,methods:'수업: '+(l.activity||s3.activity||'')+'\n평가 증거: '+(l.evidence||s2.evidence||'')+'\n연계 주안점: '+(l.goal||'')+'\n도구: '+(l.tool||''),notes:''});});
+ p.sections.performance.push({area:u.name,task:s2.task||u.ex.task,standards:standards,criteria:s2.rubric||u.ex.rubric,method:s2.plan||u.ex.plan,cautions:''});
+ p.sections.overview.push({type:'수행평가',area:u.name,method:'',max:'',ratio:'',standards:standards,base:'',time:''});
+ if(!p.sections.purpose)p.sections.purpose='[단원 설계에서 가져온 초안]\n'+(d[1]&&d[1].understand||u.ex.understand);
+ if(!p.sections.use)p.sections.use=s2.feedback||u.ex.feedback;
+ if(!p.sections.direction)p.sections.direction=s0.competency||u.ex.competency;
+ p.sourceUnits=p.sourceUnits||[];p.sourceUnits.push(u.id);opRender();save();toast('단원 내용을 추가했습니다. 일정·시수·비율·학교 규정은 직접 입력하세요.');
+}
+function opWarnings(p){
+ var out=[];['year','semester','subject'].forEach(function(k){if(!String(p.meta[k]||'').trim())out.push(k==='year'?'학년도 미입력':k==='semester'?'학기 미입력':'과목 미입력');});
+ if(!(p.sections.schedule||[]).length)out.push('교수학습-평가 계획 행이 없습니다.');
+ var overview=p.sections.overview||[],sum=0,complete=overview.length>0;
+ overview.forEach(function(r){if(String(r.ratio==null?'':r.ratio).trim()===''||!isFinite(Number(r.ratio))){complete=false;}else sum+=Number(r.ratio);});
+ if(!complete)out.push('평가 반영비율이 미입력 또는 숫자가 아닙니다.');else if(Math.abs(sum-100)>0.001)out.push('학기말 반영비율 합계 '+sum+'% (100% 여부 확인)');
+ ['policy','absence','appeal','minimum'].forEach(function(k){if(!p.sections[k])out.push(BOOT.operationSchema.sections.filter(function(s){return s.key===k;})[0].title+' 미입력');});
+ return out;
+}
+function opCheck(){var out=opWarnings(opCurrent());$('opStatus').textContent=out.length?out.join(' / '):'기본 입력 점검 완료. 내용과 학교 규정은 별도로 확인하세요.';}
+function opDownloadBlob(blob,name){var url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(url);a.remove();},1500);}
+function opExport(){opDownloadBlob(new Blob([JSON.stringify(opCurrent(),null,2)],{type:'application/json'}),'교수학습_평가_운영계획.json');}
+function opNormalize(raw){
+ if(!raw||!raw.meta||!raw.sections)throw new Error('운영 계획 JSON 형식이 아닙니다.');
+ var p={meta:{},sections:{},sourceUnits:[]};BOOT.operationSchema.meta.forEach(function(c){p.meta[c[0]]=String(raw.meta[c[0]]==null?'':raw.meta[c[0]]);});
+ BOOT.operationSchema.sections.forEach(function(s){if(s.cols){var rows=raw.sections[s.key]||[];if(!Array.isArray(rows))throw new Error(s.title+' 표 형식 오류');p.sections[s.key]=rows.map(function(r){var n={};s.cols.forEach(function(c){n[c[0]]=String(r[c[0]]==null?'':r[c[0]]);});return n;});}else p.sections[s.key]=String(raw.sections[s.key]||'');});return p;
+}
+function opDownload(){
+ opCheck();$('opDownload').disabled=true;
+ google.script.run.withSuccessHandler(function(r){$('opDownload').disabled=false;var bin=atob(r.b64),a=new Uint8Array(bin.length);for(var i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i);opDownloadBlob(new Blob([a],{type:'application/hwp+zip'}),r.name);toast('운영 계획 한글 파일을 내려받았습니다.');}).withFailureHandler(function(e){$('opDownload').disabled=false;toast('저장 실패: '+e.message);}).api_makeOperationHwpx(opCurrent());
+}
+function opPreview(){
+ var p=opCurrent(),h='<h2>'+esc((p.meta.year?p.meta.year+'학년도 ':'')+(p.meta.semester?p.meta.semester+'학기 ':'')+'수학과 교수학습 및 평가 운영 계획')+'</h2>';
+ h+='<table class="op-table">'+BOOT.operationSchema.meta.map(function(c){return '<tr><th>'+esc(c[1])+'</th><td>'+esc(p.meta[c[0]])+'</td></tr>';}).join('')+'</table>';
+ BOOT.operationSchema.sections.forEach(function(s){h+='<h3>'+esc(s.title)+'</h3>';if(s.cols){h+='<table class="op-table"><thead><tr>'+s.cols.map(function(c){return '<th>'+esc(c[1])+'</th>';}).join('')+'</tr></thead><tbody>'+((p.sections[s.key]||[]).length?p.sections[s.key]:[{}]).map(function(r){return '<tr>'+s.cols.map(function(c){return '<td>'+esc(r[c[0]])+'</td>';}).join('')+'</tr>';}).join('')+'</tbody></table>';}else h+='<p style="white-space:pre-wrap">'+esc(p.sections[s.key])+'</p>';});$('opPreviewHost').innerHTML=h;openMask('maskOpPreview');
+}
+window.addEventListener('DOMContentLoaded',function(){
+ $('btnOperation').onclick=function(){if(!BOOT){toast('자료를 불러오는 중입니다.');return;}if(!opPlans().length)opAdd();else opRender();openMask('maskOperation');};
+ $('opSelect').onchange=function(){opActive=Number(this.value);opRender();};$('opNew').onclick=opAdd;$('opCopy').onclick=opCopy;$('opAppend').onclick=opAppend;$('opCheck').onclick=opCheck;$('opJson').onclick=opExport;$('opPreview').onclick=opPreview;$('opDownload').onclick=opDownload;
+ $('opImport').onclick=function(){$('opImportFile').click();};$('opImportFile').onchange=function(){var file=this.files[0];if(!file)return;var r=new FileReader();r.onload=function(){try{opPlans().push(opNormalize(JSON.parse(r.result)));opActive=opPlans().length-1;opRender();save();}catch(e){toast('불러오기 실패: '+e.message);}};r.readAsText(file);this.value='';};
+});
+</script>

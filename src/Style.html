@@ -1,0 +1,243 @@
+<style>
+/* ==================================================================
+   깊이 있는 수업·평가 설계 도우미 — 스타일
+   ================================================================== */
+
+:root{
+  --ink:#1b2430; --ink-2:#4b5768; --ink-3:#7c8899;
+  --line:#dfe4ea; --line-2:#eef1f5;
+  --bg:#f5f7fa; --card:#fff;
+  --navy:#2b3a4a; --accent:#2f5597; --accent-soft:#eaf0f9;
+  --ok:#3f9a6a; --warn:#c78b3a;
+
+  --s0:#4a7cc7; --s0-bg:#e9f0fb;
+  --s1:#3f9a6a; --s1-bg:#e8f5ee;
+  --s2:#c78b3a; --s2-bg:#fbf1e2;
+  --s3:#7a63b8; --s3-bg:#f0ecfa;
+
+  --radius:10px;
+  --shadow:0 1px 2px rgba(27,36,48,.05), 0 4px 14px rgba(27,36,48,.06);
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",-apple-system,
+              BlinkMacSystemFont,"Segoe UI",sans-serif;
+  background:var(--bg); color:var(--ink);
+  font-size:15px; line-height:1.65; -webkit-font-smoothing:antialiased;
+}
+button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit}
+
+/* ---------- 상단 바 ---------- */
+.topbar{position:sticky;top:0;z-index:50;background:var(--navy);color:#fff;
+        padding:10px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.topbar h1{font-size:16px;margin:0;font-weight:700;letter-spacing:-.2px}
+.topbar .sub{font-size:12.5px;color:#b9c4d1}
+.topbar .spacer{flex:1}
+.modeswitch{display:flex;background:rgba(255,255,255,.12);border-radius:999px;padding:3px}
+.modeswitch button{border:0;background:transparent;color:#cfd8e3;padding:5px 14px;
+                   border-radius:999px;cursor:pointer;font-size:13px;font-weight:600;transition:.15s}
+.modeswitch button.on{background:#fff;color:var(--navy)}
+.tbtn{border:1px solid rgba(255,255,255,.28);background:transparent;color:#e7edf4;
+      padding:6px 12px;border-radius:8px;cursor:pointer;font-size:13px}
+.tbtn:hover{background:rgba(255,255,255,.12)}
+
+/* ---------- 레이아웃 ---------- */
+.wrap{max-width:1240px;margin:0 auto;padding:18px 16px 90px;
+      display:grid;grid-template-columns:300px 1fr;gap:18px;align-items:start}
+@media (max-width:940px){ .wrap{grid-template-columns:1fr} }
+.panel{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+.panel + .panel{margin-top:14px}
+.panel .head{padding:12px 16px;border-bottom:1px solid var(--line-2);font-weight:700;
+             font-size:13.5px;color:var(--ink-2)}
+.panel .body{padding:14px 16px}
+.side{position:sticky;top:64px;max-height:calc(100vh - 144px);overflow-y:auto;scrollbar-width:thin;padding-right:4px}
+@media (max-width:940px){ .side{position:static;max-height:none;overflow:visible;padding-right:0} }
+
+/* ---------- 폼 ---------- */
+label.f{display:block;font-size:12.5px;font-weight:600;color:var(--ink-2);margin:12px 0 5px}
+label.f:first-child{margin-top:0}
+select,input[type=text],textarea{width:100%;padding:8px 10px;border:1px solid var(--line);
+  border-radius:8px;background:#fff;outline:none;transition:.12s}
+select:focus,input:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+textarea{resize:vertical;line-height:1.7;min-height:60px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+.stdbox{margin-top:12px;background:var(--accent-soft);border:1px solid #d6e2f3;
+        border-radius:8px;padding:10px 12px;font-size:13px;line-height:1.6}
+.stdbox .code{font-weight:700;color:var(--accent)}
+.stdbox p{margin:0 0 6px}.stdbox p:last-child{margin-bottom:0}
+
+/* ---------- 진행 표시 ---------- */
+.steps{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.step{flex:1;min-width:130px;border:1px solid var(--line);background:#fff;border-radius:10px;
+      padding:9px 12px;cursor:pointer;text-align:left;transition:.15s;position:relative;overflow:hidden}
+.step:hover{border-color:#c3cddb}
+.step b{display:block;font-size:12px;color:var(--ink-3);font-weight:700}
+.step span{display:block;font-size:13px;font-weight:600;margin-top:1px}
+.step::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--line)}
+.step.s0::before{background:var(--s0)} .step.s1::before{background:var(--s1)}
+.step.s2::before{background:var(--s2)} .step.s3::before{background:var(--s3)}
+.step.on{border-color:var(--navy);box-shadow:var(--shadow)}
+.step.done b::after{content:" ✓";color:var(--s1)}
+
+/* ---------- 단계 카드 ---------- */
+.stage{margin-bottom:18px;border-radius:var(--radius);border:1px solid var(--line);
+       background:#fff;box-shadow:var(--shadow);overflow:hidden}
+.stage .bar{padding:14px 18px;border-bottom:1px solid var(--line-2)}
+.stage.k0 .bar{background:var(--s0-bg)} .stage.k1 .bar{background:var(--s1-bg)}
+.stage.k2 .bar{background:var(--s2-bg)} .stage.k3 .bar{background:var(--s3-bg)}
+.stage .bar .tag{font-size:12px;font-weight:700;letter-spacing:.3px}
+.stage.k0 .bar .tag{color:var(--s0)} .stage.k1 .bar .tag{color:var(--s1)}
+.stage.k2 .bar .tag{color:var(--s2)} .stage.k3 .bar .tag{color:var(--s3)}
+.stage .bar h2{margin:2px 0 8px;font-size:17px;letter-spacing:-.3px}
+.stage .bar .q{font-size:15px;font-weight:600;color:var(--ink);background:rgba(255,255,255,.75);
+               border-radius:8px;padding:10px 12px;line-height:1.6}
+.stage .bar .intro{font-size:13px;color:var(--ink-2);margin-top:8px}
+.stage .bar .ubd{font-size:12px;color:var(--ink-3);margin-top:4px}
+.stage .in{padding:16px 18px}
+
+/* ---------- 발문 칩 ---------- */
+.prompts{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.chip{background:#f2f5f9;border:1px solid var(--line);border-radius:999px;
+      padding:5px 11px;font-size:12.5px;color:var(--ink-2)}
+
+/* ---------- 접이식 박스 ---------- */
+.fold{border:1px dashed #c9d4e2;background:#fafbfd;border-radius:9px;margin-bottom:14px}
+.fold > .fhead{display:flex;align-items:center;gap:8px;padding:9px 12px;cursor:pointer;
+               font-size:13px;font-weight:700;color:var(--accent);user-select:none}
+.fold .fbody{display:none;padding:0 12px 12px}
+.fold.open .fbody{display:block}
+.fold .fhead .ar{transition:.15s}
+.fold.open .fhead .ar{transform:rotate(90deg)}
+.exitem{margin-bottom:10px}
+.exitem .lb{font-size:12px;font-weight:700;color:var(--ink-3);margin-bottom:3px}
+.exitem .tx{font-size:13.5px;white-space:pre-wrap;color:var(--ink-2);background:#fff;
+            border:1px solid var(--line-2);border-radius:7px;padding:8px 10px}
+
+/* ---------- 필드 ---------- */
+.field{margin-bottom:14px}
+.field .lbrow{display:flex;align-items:baseline;gap:8px;margin-bottom:4px;flex-wrap:wrap}
+.field .lb{font-size:13.5px;font-weight:700}
+.field .hint{font-size:12px;color:var(--ink-3)}
+
+/* ---------- 버튼 ---------- */
+.btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 11px;
+     font-size:12.5px;cursor:pointer;transition:.12s;white-space:nowrap}
+.btn:hover{background:#f4f6fa;border-color:#c3cddb}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.btn.pri:hover{background:#26467c}
+.btn.ghost{border-style:dashed;color:var(--ink-2)}
+.btn.sm{padding:3px 8px;font-size:12px}
+.btn.lg{padding:9px 18px;font-size:14px;border-radius:9px}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.rowbtns{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.navrow{display:flex;justify-content:space-between;gap:10px;margin-top:6px}
+
+/* ---------- 수업 소재 카드 ---------- */
+.matgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.matcard{border:1px solid var(--line);border-radius:9px;padding:11px 12px;background:#fff}
+.matcard .mt{font-size:13.5px;font-weight:700;margin-bottom:2px}
+.matcard .mp{font-size:11.5px;color:var(--ink-3);margin-bottom:6px}
+.matcard .mb{font-size:12.8px;color:var(--ink-2);line-height:1.6}
+.matcard .mb b{color:var(--ink);font-weight:600}
+.matcard .mfoot{margin-top:9px}
+
+/* ---------- 차시 설계표 ---------- */
+.lesson{border:1px solid var(--line);border-radius:10px;margin-bottom:12px;background:#fff}
+.lesson .lhead{display:flex;gap:8px;align-items:center;padding:9px 12px;
+               background:#f7f9fc;border-bottom:1px solid var(--line-2);border-radius:10px 10px 0 0}
+.lesson .lhead .no{font-weight:700;color:var(--s3);font-size:13px;min-width:20px}
+.lesson .lhead input{flex:1}
+.lesson .lhead input.per{max-width:110px;flex:none}
+.lesson .lhead select.ph{max-width:130px;flex:none;padding:6px 8px;font-size:12.5px}
+.phtag{display:inline-block;background:#f0ecfa;color:#7a63b8;border-radius:999px;
+       padding:1px 7px;font-size:11px;font-weight:700}
+.lesson .lbody{padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:720px){ .lesson .lbody{grid-template-columns:1fr} }
+.lesson .lbody .cell label{display:block;font-size:11.5px;font-weight:700;
+                           color:var(--ink-3);margin-bottom:3px}
+.lesson .lbody .cell.full{grid-column:1/-1}
+
+/* ---------- 점검 ---------- */
+.alignitem{display:flex;gap:9px;align-items:flex-start;padding:8px 10px;border-radius:8px;
+           background:#f7f9fc;margin-bottom:7px;font-size:13px;line-height:1.6}
+.alignitem .dot{width:9px;height:9px;border-radius:50%;margin-top:6px;flex:none}
+.alignitem.ok .dot{background:var(--ok)} .alignitem.warn .dot{background:var(--warn)}
+.alignitem .ar{font-weight:700;color:var(--ink-2);margin-right:4px}
+.scorebar{height:8px;background:var(--line-2);border-radius:999px;overflow:hidden;margin:4px 0 12px}
+.scorebar i{display:block;height:100%;background:var(--ok)}
+.checkline{display:flex;gap:8px;align-items:flex-start;font-size:13px;padding:4px 0}
+.checkline input{margin-top:5px}
+
+/* ---------- 제작 표기 ---------- */
+.credit{margin:14px 4px 0;font-size:11.5px;line-height:1.7;color:var(--ink-3);text-align:center}
+.credit b{color:var(--ink-2);font-weight:700}
+
+/* ---------- 하단 액션 바 ---------- */
+.actionbar{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);
+           padding:10px 20px;display:flex;gap:8px;align-items:center;z-index:40;flex-wrap:wrap;
+           box-shadow:0 -2px 12px rgba(27,36,48,.06)}
+.actionbar .info{font-size:12.5px;color:var(--ink-3)}
+.actionbar .spacer{flex:1}
+
+/* ---------- 모달 ---------- */
+.mask{position:fixed;inset:0;background:rgba(20,28,38,.45);display:none;z-index:60;
+      align-items:center;justify-content:center;padding:20px}
+.mask.on{display:flex}
+.modal{background:#fff;border-radius:12px;width:100%;max-width:720px;max-height:86vh;
+       overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.modal .mhead{padding:14px 18px;border-bottom:1px solid var(--line-2);display:flex;align-items:center;gap:10px}
+.modal .mhead h3{margin:0;font-size:16px}
+.modal .mbody{padding:16px 18px}
+.modal .mfoot{padding:12px 18px;border-top:1px solid var(--line-2);display:flex;gap:8px;justify-content:flex-end}
+.x{margin-left:auto;border:0;background:transparent;font-size:20px;cursor:pointer;color:var(--ink-3)}
+
+.note{font-size:12.5px;color:var(--ink-2);background:#f7f9fc;border:1px solid var(--line-2);
+      border-radius:8px;padding:10px 12px;line-height:1.65}
+.note + .note{margin-top:8px}
+.note b{color:var(--ink)}
+.quote{border-left:3px solid var(--accent);padding:6px 0 6px 12px;margin:10px 0;
+       font-size:13px;color:var(--ink-2);line-height:1.7}
+.quote cite{display:block;font-size:11.5px;color:var(--ink-3);font-style:normal;margin-top:4px}
+table.ref{width:100%;border-collapse:collapse;font-size:12.5px;margin:8px 0}
+table.ref th,table.ref td{border:1px solid var(--line);padding:7px 9px;vertical-align:top;text-align:left}
+table.ref th{background:var(--accent-soft);color:var(--accent);font-weight:700}
+
+pre.prompt{background:#1e2733;color:#dbe4ef;border-radius:9px;padding:12px 14px;font-size:12.5px;
+  line-height:1.6;white-space:pre-wrap;word-break:break-all;max-height:300px;overflow:auto;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+
+/* ---------- 미리보기 ---------- */
+.doc{background:#fff;padding:26px 30px;border:1px solid var(--line);border-radius:8px}
+.doc h1{font-size:20px;text-align:center;margin:0 0 4px;color:#1f3864}
+.doc .dsub{text-align:center;color:var(--ink-3);font-size:13px;margin-bottom:18px}
+.doc table{width:100%;border-collapse:collapse;margin-bottom:14px;font-size:13.5px}
+.doc th,.doc td{border:1px solid #8ea9db;padding:7px 9px;vertical-align:top;text-align:left}
+.doc th{background:#eaf0f9;color:#1f3864;font-weight:700;width:26%}
+.doc td{white-space:pre-wrap}
+.doc h2{font-size:15px;color:#1f3864;margin:18px 0 6px;border-bottom:1px solid #d6e2f3;padding-bottom:4px}
+.doc h3{font-size:13.5px;color:#2f5597;margin:14px 0 5px}
+.doc .dq{font-size:12.5px;color:var(--ink-3);margin:0 0 8px}
+
+/* ---------- 알림 ---------- */
+.toast{position:fixed;left:50%;bottom:78px;transform:translateX(-50%);background:var(--navy);
+       color:#fff;padding:10px 18px;border-radius:999px;font-size:13.5px;opacity:0;
+       pointer-events:none;transition:.25s;z-index:70;max-width:90vw;text-align:center}
+.toast.on{opacity:1;bottom:92px}
+.spin{display:inline-block;width:13px;height:13px;border:2px solid #c3cddb;border-top-color:#2f5597;
+      border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+.op-meta {display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:16px 0}
+.op-scroll {overflow:auto;margin:10px 0}
+.op-table {border-collapse:collapse;width:100%;min-width:700px;font-size:13px}
+.op-table th,.op-table td {border:1px solid #ccd5e3;padding:6px;vertical-align:top;white-space:pre-wrap}
+.op-table th {background:#e7edf6}
+.op-table textarea {min-width:140px;width:100%;box-sizing:border-box;min-height:100px}
+.op-table .op-short textarea {min-width:65px;max-width:95px}
+#opEditor details {margin:12px 0;border:1px solid #d6deea;padding:12px;border-radius:8px}
+#opEditor summary {cursor:pointer;font-weight:600}
+#opPreviewHost {overflow:auto}
+</style>

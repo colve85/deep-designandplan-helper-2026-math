@@ -1,0 +1,967 @@
+<style media="print">
+  body{background:#fff}
+  .topbar,.side,.steps,.actionbar,.navrow,.toast,.mfoot,.mhead{display:none !important}
+  .mask{position:static;background:none;display:block;padding:0}
+  .mask:not(.on){display:none !important}
+  .modal{box-shadow:none;max-width:none;max-height:none;border-radius:0}
+  .wrap{display:block;padding:0}
+  #stageHost{display:none}
+</style>
+
+<script>
+/* ==================================================================
+   깊이 있는 수업·평가 설계 도우미 — 화면 로직
+   ================================================================== */
+
+var BOOT = null;
+var STORE_KEY = 'deepDesign.v3';
+var SETTINGS_KEY = 'deepDesign.settings';
+
+/* 서버에 키를 두지 않는 배포(Vercel 등)에서 쓰는 브라우저 쪽 설정 */
+var localSettings = { apiKey: '', model: '' };
+function isLocalKeyMode(){ return BOOT && BOOT.runtime && BOOT.runtime !== 'gas'; }
+function loadLocalSettings(){
+  try {
+    var raw = localStorage.getItem(SETTINGS_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch(e){}
+  return { apiKey:'', model:'' };
+}
+function saveLocalSettings(){
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(localSettings)); } catch(e){}
+}
+
+var state = {
+  standardOverrides: {},
+  unitDrafts: {},
+  mode: 'training',
+  current: 0,
+  unitId: '',
+  meta: { school:'', teacher:'', grade:'', periods:'', context:'' },
+  stages: { 0:{}, 1:{}, 2:{}, 3:{} },
+  lessons: [],
+  checks: {}
+};
+
+/* ---------------- 유틸 ---------------- */
+function $(id){ return document.getElementById(id); }
+function esc(s){
+  return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+var toastTimer=null;
+function toast(msg){
+  var t=$('toast'); t.textContent=msg; t.classList.add('on');
+  clearTimeout(toastTimer); toastTimer=setTimeout(function(){ t.classList.remove('on'); },2800);
+}
+function openMask(id){ $(id).classList.add('on'); }
+function closeMask(id){ $(id).classList.remove('on'); }
+function emptyLesson(){
+  return { phase:'', element:'', periods:'', material:'', open:'', goal:'',
+           evidence:'', activity:'', tool:'' };
+}
+
+/* ---------------- 초기화 ---------------- */
+window.addEventListener('DOMContentLoaded', function(){
+  google.script.run
+    .withSuccessHandler(onBoot)
+    .withFailureHandler(function(e){ toast('데이터를 불러오지 못했습니다: '+e.message); })
+    .api_bootstrap();
+
+  document.querySelectorAll('[data-close]').forEach(function(b){
+    b.addEventListener('click', function(){ var m=b.closest('.mask'); if(m) m.classList.remove('on'); });
+  });
+  document.querySelectorAll('.mask').forEach(function(m){
+    m.addEventListener('click', function(ev){ if(ev.target===m) m.classList.remove('on'); });
+  });
+
+  $('modeSwitch').addEventListener('click', function(ev){
+    var b=ev.target.closest('button'); if(!b) return;
+    state.mode=b.getAttribute('data-mode');
+    document.querySelectorAll('#modeSwitch button').forEach(function(x){ x.classList.toggle('on', x===b); });
+    render(); save();
+  });
+
+  $('btnSettings').addEventListener('click', openSettings);
+  $('btnGuide').addEventListener('click', function(){ openMask('maskGuide'); });
+  $('btnFramework').addEventListener('click', showFramework);
+  $('btnSaveSettings').addEventListener('click', saveSettings);
+  $('btnClearKey').addEventListener('click', clearKey);
+  $('btnPreview').addEventListener('click', showPreview);
+  $('btnPrint').addEventListener('click', function(){ window.print(); });
+  $('btnHwp').addEventListener('click', downloadHwpx);
+  $('btnHwp2').addEventListener('click', downloadHwpx);
+  $('btnDrive').addEventListener('click', function(){ $('driveResult').innerHTML=''; openMask('maskDrive'); });
+  $('btnDriveSave').addEventListener('click', saveToDrive);
+  $('btnCopyPrompt').addEventListener('click', copyPrompt);
+  $('btnApplyPasted').addEventListener('click', applyPasted);
+  $('btnCheck').addEventListener('click', runCheck);
+  $('btnExport').addEventListener('click', exportJson);
+  $('btnImport').addEventListener('click', function(){ $('fileImport').click(); });
+  $('fileImport').addEventListener('change', importJson);
+  $('btnFillAll').addEventListener('click', function(){ fillExample(null); });
+  $('btnFillMissing').addEventListener('click', function(){ fillExample(null,true); });
+  $('btnClearAll').addEventListener('click', function(){
+    if(!confirm('작성한 내용을 모두 비웁니다. 계속할까요?')) return;
+    state.stages={0:{},1:{},2:{},3:{}}; state.lessons=[]; state.checks={};
+    render(); save(); toast('모두 비웠습니다.');
+  });
+  $('btnPrev').addEventListener('click', function(){ goStage(state.current-1); });
+  $('btnNext').addEventListener('click', function(){ goStage(state.current+1); });
+
+  [['inSchool','school'],['inTeacher','teacher'],['inGrade','grade'],
+   ['inPeriods','periods'],['inContext','context']].forEach(function(p){
+    $(p[0]).addEventListener('input', function(){ state.meta[p[1]]=$(p[0]).value; save(); });
+  });
+
+  $('selSubject').addEventListener('change', function(){ fillAreas(); });
+  $('selArea').addEventListener('change', function(){ fillUnits(); });
+  $('selUnit').addEventListener('change', function(){ onUnitChange(); });
+});
+
+function onBoot(boot){
+  BOOT = boot;
+  if (isLocalKeyMode()){
+    localSettings = loadLocalSettings();
+    BOOT.settings = { hasKey: !!localSettings.apiKey,
+                      model: localSettings.model || BOOT.settings.model };
+    var db = $('btnDrive'); if (db) db.style.display = 'none';   // 드라이브 저장은 Apps Script 전용
+  }
+  renderCredit();
+  restore();
+  fillSubjects();
+  applyMetaToInputs();
+  render();
+}
+
+/** 제작 표기 — 값은 Code.gs 의 APP_CREDIT 한 곳에서만 고친다. */
+function renderCredit(){
+  var c=BOOT.credit||{};
+  var html=esc(c.training||'')+'<br><b>'+esc(c.author||'')+'</b><br>버전 '+esc(BOOT.version||'');
+  ['creditBox','creditBox2'].forEach(function(id){
+    var el=$(id); if(el) el.innerHTML=html;
+  });
+}
+
+/* ---------------- 단원 선택 ---------------- */
+function currentUnit(){
+  if(!BOOT) return null;
+  for(var i=0;i<BOOT.units.length;i++) if(BOOT.units[i].id===state.unitId) return BOOT.units[i];
+  return null;
+}
+function fillSubjects(){
+  var sel=$('selSubject'); sel.innerHTML='';
+  BOOT.subjects.forEach(function(s){
+    var o=document.createElement('option'); o.value=s; o.textContent=s; sel.appendChild(o);
+  });
+  var cur=currentUnit(); if(cur) sel.value=cur.subject;
+  fillAreas(true);
+}
+function fillAreas(keep){
+  var subject=$('selSubject').value, seen={}, list=[];
+  BOOT.units.forEach(function(u){
+    if(u.subject===subject && !seen[u.area]){ seen[u.area]=1; list.push(u.area); }
+  });
+  var sel=$('selArea'); sel.innerHTML='';
+  list.forEach(function(a){
+    var o=document.createElement('option'); o.value=a; o.textContent=a; sel.appendChild(o);
+  });
+  var cur=currentUnit();
+  if(keep && cur && cur.subject===subject) sel.value=cur.area;
+  fillUnits(keep);
+}
+function fillUnits(keep){
+  var subject=$('selSubject').value, area=$('selArea').value;
+  var sel=$('selUnit'); sel.innerHTML='';
+  BOOT.units.forEach(function(u){
+    if(u.subject===subject && u.area===area){
+      var o=document.createElement('option'); o.value=u.id; o.textContent=(u.officialName && u.officialName!==u.name ? u.officialName+' · '+u.name : u.name); sel.appendChild(o);
+    }
+  });
+  var cur=currentUnit();
+  if(keep && cur && cur.subject===subject && cur.area===area) sel.value=cur.id;
+  onUnitChange();
+}
+function onUnitChange(){
+  var next=$('selUnit').value||'';
+  if(state.unitId && next!==state.unitId){
+    state.unitDrafts=state.unitDrafts||{};
+    state.unitDrafts[state.unitId]=JSON.parse(JSON.stringify({stages:state.stages,lessons:state.lessons,checks:state.checks,meta:state.meta}));
+    var draft=state.unitDrafts[next];
+    state.stages=draft?draft.stages:{0:{},1:{},2:{},3:{}};
+    state.lessons=draft?draft.lessons:[];
+    state.checks=draft?draft.checks:{};
+    state.meta=draft?draft.meta:Object.assign({},state.meta,{periods:'',context:''});
+    applyMetaToInputs();
+  }
+  state.unitId=next;
+  renderStandards(); render(); save();
+}
+function renderStandards(){
+  var u=currentUnit(), box=$('stdBox');
+  if(!u){ box.textContent='단원을 선택하면 성취기준이 표시됩니다.'; return; }
+  var standards=selectedStandards(u);
+  var officialMeta='';
+  if(u.officialContentElements){
+    officialMeta='<p class="note"><b>공식 영역·내용요소</b> '+esc(u.officialName)+' · '+esc((u.officialContentElements||[]).join(', '))+'<br><b>핵심 아이디어 원문</b> '+esc((u.officialCoreIdeas||[]).join(' / '))+'<br><b>출처</b> '+esc(u.officialSource||'별책8·별책20 수학과 교육과정')+'</p>';
+  }
+  box.innerHTML=officialMeta+(u.sourceNote?'<p class="note">'+esc(u.sourceNote)+'</p>':'')+standards.map(function(s){
+    return '<p><span class="code">['+esc(s.code)+']</span> '+esc(s.text)+'</p>';
+  }).join('')+
+    '<details><summary>성취기준 원문 입력·수정</summary><p class="note">한 줄에 코드 | 원문을 입력합니다. 입력 내용은 이 단원의 프롬프트·미리보기·한글 문서에 함께 적용됩니다.</p>'+
+    '<textarea id="stdEdit" rows="6" aria-label="성취기준 원문">'+esc(standards.map(function(s){return s.code+' | '+s.text;}).join('\n'))+'</textarea><button type="button" class="btn" id="stdApply">성취기준 적용</button><button type="button" class="btn" id="stdReset">기본 예시로 복원</button></details>';
+  $('stdApply').onclick=function(){
+    var lines=$('stdEdit').value.split('\n').filter(function(v){return v.trim();}), out=[];
+    for(var i=0;i<lines.length;i++){
+      var p=lines[i].indexOf('|');
+      if(p<1 || !lines[i].slice(p+1).trim()){toast('각 줄을 코드 | 원문 형식으로 입력하세요.');return;}
+      out.push({code:lines[i].slice(0,p).trim(),text:lines[i].slice(p+1).trim()});
+    }
+    if(!out.length){toast('성취기준을 한 개 이상 입력하세요.');return;}
+    state.standardOverrides[u.id]=out;renderStandards();save();toast('성취기준을 적용했습니다.');
+  };
+  $('stdReset').onclick=function(){delete state.standardOverrides[u.id];renderStandards();save();};
+}
+function selectedStandards(u){
+  return u ? ((state.standardOverrides||{})[u.id]||u.standards) : [];
+}
+
+/* ---------------- 렌더 ---------------- */
+function stageDef(id){
+  for(var i=0;i<BOOT.stages.length;i++) if(BOOT.stages[i].id===id) return BOOT.stages[i];
+  return null;
+}
+function isStageFilled(id){
+  var st=stageDef(id), d=state.stages[id]||{};
+  for(var i=0;i<st.fields.length;i++){ var v=d[st.fields[i].key]; if(v&&String(v).trim()) return true; }
+  return false;
+}
+function render(){
+  renderSteps();
+  var host=$('stageHost'); host.innerHTML='';
+  var list=(state.mode==='training')?[state.current]:[0,1,2,3];
+  list.forEach(function(id){ host.appendChild(stageCard(id)); });
+  if(list.indexOf(3)>=0) renderLessons();
+  $('navRow').style.display=(state.mode==='training')?'flex':'none';
+  $('btnPrev').disabled=(state.current===0);
+  $('btnNext').disabled=(state.current===3);
+}
+function renderSteps(){
+  var box=$('steps'); box.innerHTML='';
+  BOOT.stages.forEach(function(st){
+    var b=document.createElement('button');
+    b.className='step s'+st.id+
+      (state.mode==='training'&&state.current===st.id?' on':'')+
+      (isStageFilled(st.id)?' done':'');
+    b.innerHTML='<b>'+esc(st.label)+'</b><span>'+esc(st.name)+'</span>';
+    b.addEventListener('click', function(){ goStage(st.id); });
+    box.appendChild(b);
+  });
+}
+function goStage(id){
+  if(id<0||id>3) return;
+  state.current=id;
+  render();
+  if(state.mode==='training'){ window.scrollTo({top:0,behavior:'smooth'}); }
+  else { var el=document.querySelector('.stage.k'+id); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); }
+  save();
+}
+
+/**
+ * AI 버튼은 저장된 키가 있을 때만 두 개로 나뉜다.
+ * 키가 없으면 [AI로 초안 만들기]도 결국 붙여넣기 창을 열기 때문에,
+ * 같은 일을 하는 버튼을 둘 보여 주지 않는다.
+ */
+function aiButtons(id){
+  if(BOOT.settings.hasKey){
+    return '<button class="btn pri" data-ai="1">AI로 초안 만들기</button>'+
+           '<button class="btn" data-paste="1">다른 AI로 하기</button>';
+  }
+  return '<button class="btn pri" data-paste="1">AI 프롬프트 만들기</button>';
+}
+
+function stageCard(id){
+  var st=stageDef(id), u=currentUnit();
+  var w=document.createElement('div');
+  w.className='stage k'+id;
+
+  var chips=(BOOT.deepPrompts[id]||[]).map(function(p){
+    return '<span class="chip">'+esc(p)+'</span>';
+  }).join('');
+
+  var exHtml='';
+  if(u){
+    var items=st.fields.map(function(f){
+      return '<div class="exitem"><div class="lb">'+esc(f.label)+'</div>'+
+             '<div class="tx">'+esc(u.ex[f.key]||'')+'</div></div>';
+    }).join('');
+    exHtml='<div class="fold"><div class="fhead"><span class="ar">▸</span> 이 단원 예시 보기 — '+esc(u.name)+'</div>'+
+           '<div class="fbody">'+items+
+           '<div class="rowbtns"><button class="btn pri" data-fill="1">이 단계에 예시 넣기</button>'+
+           '<button class="btn" data-append="1">빈 칸에만 채우기</button></div></div></div>';
+  }
+
+  var fields=st.fields.map(function(f){
+    var val=(state.stages[id]||{})[f.key]||'';
+    return '<div class="field"><div class="lbrow"><span class="lb">'+esc(f.label)+'</span>'+
+      '<span class="hint">'+esc(f.hint)+'</span></div>'+
+      '<textarea data-fk="'+f.key+'" rows="'+(f.rows||3)+'">'+esc(val)+'</textarea></div>';
+  }).join('');
+
+  var checks=st.checklist.map(function(c,i){
+    var key=id+'-'+i;
+    return '<label class="checkline"><input type="checkbox" data-ck="'+key+'"'+
+           (state.checks[key]?' checked':'')+'><span>'+esc(c)+'</span></label>';
+  }).join('');
+
+  w.innerHTML=
+    '<div class="bar">'+
+      '<div class="tag">'+esc(st.label)+'</div>'+
+      '<h2>'+esc(st.name)+'</h2>'+
+      '<div class="q">'+esc(st.question)+'</div>'+
+      '<div class="intro">'+esc(st.intro)+'</div>'+
+      '<div class="ubd">'+esc(st.mapping)+'</div>'+
+    '</div>'+
+    '<div class="in">'+
+      '<div class="prompts">'+chips+'</div>'+
+      exHtml+
+      fields+
+      '<div class="rowbtns" style="margin-bottom:14px">'+
+        aiButtons(id)+
+        '<span class="hint" id="aiMsg'+id+'" style="color:#7c8899;font-size:12.5px"></span>'+
+      '</div>'+
+      (id===3 ? lessonSection(u) : '')+
+      '<div class="fold"><div class="fhead"><span class="ar">▸</span> 이 단계 자가 점검</div>'+
+      '<div class="fbody">'+checks+'</div></div>'+
+    '</div>';
+
+  w.querySelectorAll('.fhead').forEach(function(h){
+    h.addEventListener('click', function(){ h.parentNode.classList.toggle('open'); });
+  });
+  w.querySelectorAll('textarea[data-fk]').forEach(function(ta){
+    ta.addEventListener('input', function(){
+      state.stages[id]=state.stages[id]||{};
+      state.stages[id][ta.getAttribute('data-fk')]=ta.value;
+      save(); renderSteps();
+    });
+  });
+  w.querySelectorAll('input[data-ck]').forEach(function(cb){
+    cb.addEventListener('change', function(){
+      state.checks[cb.getAttribute('data-ck')]=cb.checked; save();
+    });
+  });
+  var fb=w.querySelector('[data-fill]'); if(fb) fb.addEventListener('click', function(){ fillExample(id,false); });
+  var ab=w.querySelector('[data-append]'); if(ab) ab.addEventListener('click', function(){ fillExample(id,true); });
+  var aiBtn=w.querySelector('[data-ai]');
+  if(aiBtn) aiBtn.addEventListener('click', function(){ runAI(id); });
+  var pasteBtn=w.querySelector('[data-paste]');
+  if(pasteBtn) pasteBtn.addEventListener('click', function(){ openPrompt(id); });
+
+  if(id===3){
+    var mg=w.querySelector('#matHost');
+    if(mg && u) mg.innerHTML=materialCards(u);
+    w.querySelectorAll('[data-mat]').forEach(function(btn){
+      btn.addEventListener('click', function(){ addLessonFrom(parseInt(btn.getAttribute('data-mat'),10)); });
+    });
+    var all=w.querySelector('#btnMatAll');
+    if(all) all.addEventListener('click', loadAllLessons);
+    w.querySelector('#btnLessonAdd').addEventListener('click', function(){
+      state.lessons.push(emptyLesson()); renderLessons(); save();
+    });
+    w.querySelector('#btnLessonAI').addEventListener('click', runLessonAI);
+  }
+  return w;
+}
+
+/* ---------------- 3단계: 수업 소재 · 차시 설계표 ---------------- */
+function lessonSection(u){
+  return ''+
+  '<div class="fold open" style="border-style:solid;border-color:#e3e8ef;background:#fff">'+
+    '<div class="fhead" style="color:#7a63b8"><span class="ar">▸</span> 단원별 수업 소재 카드 — 눌러서 차시표에 넣기</div>'+
+    '<div class="fbody">'+
+      '<div class="matgrid" id="matHost"></div>'+
+      '<div class="rowbtns" style="margin-top:10px"><button class="btn" id="btnMatAll">소재 전체를 차시표로 불러오기</button></div>'+
+    '</div>'+
+  '</div>'+
+  '<div style="margin:6px 0 8px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">'+
+    '<b style="font-size:14px">차시별 수업 설계</b>'+
+    '<span class="hint" style="font-size:12px;color:#7c8899">내용 요소마다 도달 목표 → 확인할 증거 → 수업 소재와 학생 활동 순으로 설계합니다.</span>'+
+  '</div>'+
+  '<div id="lessonHost"></div>'+
+  '<div class="rowbtns" style="margin-bottom:16px">'+
+    '<button class="btn" id="btnLessonAdd">+ 차시 추가</button>'+
+    '<button class="btn pri" id="btnLessonAI">'+
+      (BOOT.settings.hasKey ? 'AI로 소재 제안받기' : '소재 제안 프롬프트 만들기')+'</button>'+
+    '<span class="hint" id="aiMsgL" style="color:#7c8899;font-size:12.5px"></span>'+
+  '</div>';
+}
+
+function materialCards(u){
+  if(!u || !u.lessons || !u.lessons.length) return '<p class="note">이 단원에는 등록된 소재가 없습니다.</p>';
+  return u.lessons.map(function(L,i){
+    return '<div class="matcard">'+
+      '<div class="mt">'+esc(L.element)+'</div>'+
+      '<div class="mp">'+(L.phase?'<span class="phtag">'+esc(L.phase)+'</span> ':'')+
+      esc(L.periods||'')+'</div>'+
+      '<div class="mb"><b>소재</b> '+esc(L.material)+'<br>'+
+      '<b>여는 질문</b> '+esc(L.open)+'<br>'+
+      '<b>목표</b> '+esc(L.goal)+'<br>'+
+      '<b>증거</b> '+esc(L.evidence)+'</div>'+
+      '<div class="mfoot"><button class="btn sm pri" data-mat="'+i+'">차시표에 넣기</button></div>'+
+    '</div>';
+  }).join('');
+}
+
+function renderLessons(){
+  var host=$('lessonHost'); if(!host) return;
+  if(!state.lessons.length){
+    host.innerHTML='<p class="note">아직 차시가 없습니다. 위의 소재 카드를 누르거나 <b>+ 차시 추가</b>로 시작하세요.</p>';
+    return;
+  }
+  var cols=BOOT.lessonColumns.filter(function(c){
+    return c.key!=='element' && c.key!=='periods' && c.key!=='phase';
+  });
+  var phaseOpts=function(cur){
+    return '<option value="">단계</option>'+BOOT.lessonPhases.map(function(p){
+      return '<option value="'+esc(p)+'"'+(cur===p?' selected':'')+'>'+esc(p)+'</option>';
+    }).join('');
+  };
+  host.innerHTML=state.lessons.map(function(L,i){
+    var cells=cols.map(function(c){
+      var full=(c.key==='material'||c.key==='activity');
+      return '<div class="cell'+(full?' full':'')+'">'+
+        '<label>'+esc(c.label)+'</label>'+
+        '<textarea data-li="'+i+'" data-lk="'+c.key+'" rows="'+(full?2:2)+'" '+
+        'placeholder="'+esc(c.hint)+'">'+esc(L[c.key]||'')+'</textarea></div>';
+    }).join('');
+    return '<div class="lesson">'+
+      '<div class="lhead">'+
+        '<span class="no">'+(i+1)+'</span>'+
+        '<select class="ph" data-li="'+i+'" data-lk="phase">'+phaseOpts(L.phase||'')+'</select>'+
+        '<input type="text" data-li="'+i+'" data-lk="element" placeholder="내용 요소" value="'+esc(L.element||'')+'">'+
+        '<input type="text" class="per" data-li="'+i+'" data-lk="periods" placeholder="차시" value="'+esc(L.periods||'')+'">'+
+        '<button class="btn sm" data-lup="'+i+'">↑</button>'+
+        '<button class="btn sm" data-ldn="'+i+'">↓</button>'+
+        '<button class="btn sm" data-ldel="'+i+'">삭제</button>'+
+      '</div>'+
+      '<div class="lbody">'+cells+'</div>'+
+    '</div>';
+  }).join('');
+
+  host.querySelectorAll('[data-lk]').forEach(function(el){
+    var ev=(el.tagName==='SELECT')?'change':'input';
+    el.addEventListener(ev, function(){
+      var i=parseInt(el.getAttribute('data-li'),10);
+      state.lessons[i][el.getAttribute('data-lk')]=el.value;
+      save();
+    });
+  });
+  host.querySelectorAll('[data-ldel]').forEach(function(b){
+    b.addEventListener('click', function(){
+      state.lessons.splice(parseInt(b.getAttribute('data-ldel'),10),1); renderLessons(); save();
+    });
+  });
+  host.querySelectorAll('[data-lup]').forEach(function(b){
+    b.addEventListener('click', function(){
+      var i=parseInt(b.getAttribute('data-lup'),10); if(i===0) return;
+      var t=state.lessons[i-1]; state.lessons[i-1]=state.lessons[i]; state.lessons[i]=t;
+      renderLessons(); save();
+    });
+  });
+  host.querySelectorAll('[data-ldn]').forEach(function(b){
+    b.addEventListener('click', function(){
+      var i=parseInt(b.getAttribute('data-ldn'),10); if(i>=state.lessons.length-1) return;
+      var t=state.lessons[i+1]; state.lessons[i+1]=state.lessons[i]; state.lessons[i]=t;
+      renderLessons(); save();
+    });
+  });
+}
+
+function addLessonFrom(i){
+  var u=currentUnit(); if(!u) return;
+  var src=u.lessons[i]; if(!src) return;
+  var row=emptyLesson();
+  Object.keys(row).forEach(function(k){ row[k]=src[k]||''; });
+  state.lessons.push(row); renderLessons(); save();
+  toast('"'+src.element+'" 을(를) 차시표에 넣었습니다.');
+}
+function loadAllLessons(){
+  var u=currentUnit(); if(!u) return;
+  if(state.lessons.length && !confirm('차시표를 이 단원의 소재로 다시 채웁니다. 계속할까요?')) return;
+  state.lessons=u.lessons.map(function(src){
+    var row=emptyLesson();
+    Object.keys(row).forEach(function(k){ row[k]=src[k]||''; });
+    return row;
+  });
+  renderLessons(); save(); toast('소재 '+state.lessons.length+'개를 불러왔습니다.');
+}
+
+/* ---------------- 예시 채우기 ---------------- */
+function fillExample(stageId, onlyEmpty){
+  var u=currentUnit();
+  if(!u){ toast('먼저 단원을 선택하세요.'); return; }
+  var ids=(stageId===null)?[0,1,2,3]:[stageId], missing=[], count=0;
+  ids.forEach(function(id){
+    var st=stageDef(id);
+    state.stages[id]=state.stages[id]||{};
+    st.fields.forEach(function(f){
+      var cur=state.stages[id][f.key];
+      if(onlyEmpty && cur && String(cur).trim()) return;
+      var example=(u.ex&&u.ex[f.key])||'';
+      if(String(example).trim()) { state.stages[id][f.key]=example; count++; }
+      else missing.push(st.label+' '+f.label);
+    });
+  });
+  if(stageId===null && !state.lessons.length){
+    state.lessons=u.lessons.map(function(src){
+      var row=emptyLesson();
+      Object.keys(row).forEach(function(k){ row[k]=src[k]||''; });
+      return row;
+    });
+  }
+  render(); save();
+  if(missing.length){
+    toast('예시 '+count+'개 반영. 누락된 항목 '+missing.length+'개가 있습니다.');
+    $('checkHost').innerHTML='<p>아래 항목은 예시 데이터가 없어 채우지 못했습니다.</p><ul>'+missing.map(function(v){return '<li>'+esc(v)+'</li>';}).join('')+'</ul>';
+    openMask('maskCheck');
+  } else toast((onlyEmpty?'빈칸 ':'')+'예시 '+count+'개를 채웠습니다.');
+}
+
+/* ---------------- AI ---------------- */
+function buildRequest(stageId, kind){
+  var u=currentUnit();
+  var req={
+    stageId: stageId, kind: kind||'stage',
+    meta: {
+      subject: u?u.subject:'', area: u?u.area:'', unit: u?u.name:'',
+      standards: selectedStandards(u),
+      grade: state.meta.grade, periods: state.meta.periods, context: state.meta.context
+    },
+    stages: state.stages,
+    lessons: state.lessons
+  };
+  if (isLocalKeyMode()){                 // 서버에 키를 두지 않는 배포
+    req.apiKey = localSettings.apiKey || '';
+    req.model  = localSettings.model  || '';
+  }
+  return req;
+}
+function runAI(stageId){
+  var u=currentUnit();
+  if(!u){ toast('먼저 단원을 선택하세요.'); return; }
+  if(!BOOT.settings.hasKey){ openPrompt(stageId); return; }
+  var msg=$('aiMsg'+stageId);
+  if(msg) msg.innerHTML='<span class="spin"></span> 생성 중…';
+  google.script.run
+    .withSuccessHandler(function(res){
+      if(msg) msg.textContent='';
+      if(!res.ok){ toast(res.message); if(res.error==='NO_KEY') openPrompt(stageId); return; }
+      if(!res.parsed){ toast('응답 형식을 읽지 못했습니다. 붙여넣기 모드로 확인해 주세요.');
+                       openPrompt(stageId,res.raw); return; }
+      applyParsed(stageId,res.parsed);
+      toast('초안을 채웠습니다. 반드시 검토하고 고쳐 쓰세요.');
+    })
+    .withFailureHandler(function(e){ if(msg) msg.textContent=''; toast('오류: '+e.message); })
+    .api_generate(buildRequest(stageId));
+}
+function runLessonAI(){
+  var u=currentUnit();
+  if(!u){ toast('먼저 단원을 선택하세요.'); return; }
+  if(!BOOT.settings.hasKey){ openPrompt(3,'',"lessons"); return; }
+  var msg=$('aiMsgL');
+  if(msg) msg.innerHTML='<span class="spin"></span> 소재 제안 중…';
+  google.script.run
+    .withSuccessHandler(function(res){
+      if(msg) msg.textContent='';
+      if(!res.ok){ toast(res.message); return; }
+      if(!res.parsed || !res.parsed.length){ toast('제안을 읽지 못했습니다. 붙여넣기 모드를 사용해 보세요.'); return; }
+      applyLessonRows(res.parsed);
+    })
+    .withFailureHandler(function(e){ if(msg) msg.textContent=''; toast('오류: '+e.message); })
+    .api_generate(buildRequest(3,'lessons'));
+}
+function applyLessonRows(rows){
+  rows.forEach(function(r){
+    var row=emptyLesson();
+    Object.keys(row).forEach(function(k){ row[k]=r[k]||''; });
+    state.lessons.push(row);
+  });
+  renderLessons(); save();
+  toast(rows.length+'개 차시를 추가했습니다. 검토 후 고쳐 쓰세요.');
+}
+function applyParsed(stageId,obj){
+  var st=stageDef(stageId);
+  state.stages[stageId]=state.stages[stageId]||{};
+  st.fields.forEach(function(f){ if(obj[f.key]) state.stages[stageId][f.key]=String(obj[f.key]); });
+  render(); save();
+}
+
+var pasteStageId=0, pasteKind='stage';
+function openPrompt(stageId, prefill, kind){
+  var u=currentUnit();
+  if(!u){ toast('먼저 단원을 선택하세요.'); return; }
+  pasteStageId=stageId; pasteKind=kind||'stage';
+  $('inPasted').value=prefill||'';
+  $('promptText').textContent='프롬프트를 만드는 중…';
+  openMask('maskPrompt');
+  var req=buildRequest(stageId,pasteKind);
+  var runner=google.script.run
+    .withSuccessHandler(function(p){ $('promptText').textContent=p; })
+    .withFailureHandler(function(e){ $('promptText').textContent='오류: '+e.message; });
+  if(pasteKind==='lessons') runner.api_buildLessonPrompt(req);
+  else runner.api_buildPrompt(req);
+}
+function copyPrompt(){
+  var text=$('promptText').textContent;
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(function(){ toast('프롬프트를 복사했습니다.'); },
+                                            function(){ legacyCopy(text); });
+  } else legacyCopy(text);
+}
+function legacyCopy(text){
+  var ta=document.createElement('textarea');
+  ta.value=text; ta.style.position='fixed'; ta.style.opacity='0';
+  document.body.appendChild(ta); ta.select();
+  try{ document.execCommand('copy'); toast('프롬프트를 복사했습니다.'); }
+  catch(e){ toast('복사가 막혔습니다. 직접 선택해 복사해 주세요.'); }
+  document.body.removeChild(ta);
+}
+function applyPasted(){
+  var text=$('inPasted').value;
+  if(!text.trim()){ toast('붙여넣은 내용이 없습니다.'); return; }
+  google.script.run
+    .withSuccessHandler(function(res){
+      if(!res.ok){
+        toast(pasteKind==='lessons'
+          ? '형식을 찾지 못했습니다. [ 로 시작해 ] 로 끝나는 부분만 붙여 넣어 보세요.'
+          : '형식을 찾지 못했습니다. { 로 시작해 } 로 끝나는 부분만 붙여 넣어 보세요.');
+        return;
+      }
+      if(pasteKind==='lessons') applyLessonRows(res.parsed);
+      else applyParsed(pasteStageId,res.parsed);
+      closeMask('maskPrompt');
+    })
+    .withFailureHandler(function(e){ toast('오류: '+e.message); })
+    .api_parsePasted({ text:text, kind:pasteKind });
+}
+
+/* ---------------- 설정 ---------------- */
+function openSettings(){
+  $('inKey').value='';
+  $('inKey').placeholder=BOOT.settings.hasKey?'저장된 키 있음 (바꾸려면 새 키 입력)':'AIza…';
+  $('inModel').value=BOOT.settings.model||'';
+  $('btnClearKey').style.display=BOOT.settings.hasKey?'inline-block':'none';
+  $('keyWhere').textContent=isLocalKeyMode()
+    ? '이 배포에서는 키가 서버에 저장되지 않고 이 브라우저에만 보관됩니다. 요청할 때마다 전달되어 Gemini로 중계됩니다.'
+    : '키는 사용자 본인 계정의 사용자 속성에 저장됩니다.';
+  openMask('maskSettings');
+}
+function saveSettings(){
+  var key=$('inKey').value.trim(), model=$('inModel').value.trim();
+  if (isLocalKeyMode()){
+    if (key) localSettings.apiKey=key;
+    localSettings.model=model;
+    saveLocalSettings();
+    BOOT.settings={ hasKey:!!localSettings.apiKey, model:localSettings.model||BOOT.settings.model };
+    closeMask('maskSettings'); render(); toast('이 브라우저에 저장했습니다.');
+    return;
+  }
+  google.script.run
+    .withSuccessHandler(function(s){ BOOT.settings=s; closeMask('maskSettings'); render(); toast('저장했습니다.'); })
+    .withFailureHandler(function(e){ toast('오류: '+e.message); })
+    .api_saveSettings({ apiKey:key?key:null, model:model });
+}
+function clearKey(){
+  if(!confirm('저장된 API 키를 지웁니다. 계속할까요?')) return;
+  if (isLocalKeyMode()){
+    localSettings.apiKey=''; saveLocalSettings();
+    BOOT.settings.hasKey=false;
+    $('btnClearKey').style.display='none';
+    $('inKey').placeholder='AIza…';
+    render(); toast('키를 지웠습니다.');
+    return;
+  }
+  google.script.run
+    .withSuccessHandler(function(s){
+      BOOT.settings=s; $('btnClearKey').style.display='none';
+      $('inKey').placeholder='AIza…'; render(); toast('키를 지웠습니다.');
+    })
+    .withFailureHandler(function(e){ toast('오류: '+e.message); })
+    .api_saveSettings({ apiKey:'' });
+}
+
+/* ---------------- 설계 점검 ---------------- */
+function runCheck(){
+  var u=currentUnit();
+  if(!u){ toast('먼저 단원을 선택하세요.'); return; }
+  $('checkHost').innerHTML='<p class="note">점검 중…</p>';
+  openMask('maskCheck');
+  google.script.run
+    .withSuccessHandler(renderCheck)
+    .withFailureHandler(function(e){ $('checkHost').innerHTML='<p class="note">오류: '+esc(e.message)+'</p>'; })
+    .api_checkAlignment(designPayload());
+}
+function renderCheck(res){
+  lastAlignment=res;
+  var h=[];
+  h.push('<div style="font-size:13px;color:#4b5768">자동 점검 통과 '+res.score+'%</div>');
+  h.push('<div class="scorebar"><i style="width:'+res.score+'%"></i></div>');
+  res.items.forEach(function(it){
+    h.push('<div class="alignitem '+it.level+'"><span class="dot"></span>'+
+           '<div><span class="ar">'+esc(it.area)+'</span>'+esc(it.message)+'</div></div>');
+  });
+  h.push('<p class="note" style="margin-top:12px">자동 점검은 표현의 겹침을 보는 참고 지표입니다. '+
+         '아래 자가 점검 문항으로 직접 확인해 주세요.</p>');
+  BOOT.stages.forEach(function(st){
+    h.push('<div style="margin-top:12px"><b style="font-size:13px">'+esc(st.label)+' '+esc(st.name)+'</b>');
+    st.checklist.forEach(function(c,i){
+      var key=st.id+'-'+i;
+      h.push('<div class="checkline"><span>'+(state.checks[key]?'✅':'☐')+'</span><span>'+esc(c)+'</span></div>');
+    });
+    h.push('</div>');
+  });
+  $('checkHost').innerHTML=h.join('');
+}
+var lastAlignment=null;
+
+/* ---------------- 참고 자료 ---------------- */
+function showFramework(){
+  var F=BOOT.framework, h=[];
+  function tbl(heads, rows){
+    var s='<table class="ref"><tr>'+heads.map(function(x){ return '<th>'+esc(x)+'</th>'; }).join('')+'</tr>';
+    rows.forEach(function(r){
+      s+='<tr>'+r.map(function(c){ return '<td>'+esc(c)+'</td>'; }).join('')+'</tr>';
+    });
+    return s+'</table>';
+  }
+  function head(t){ return '<p class="note" style="margin-top:16px"><b>'+esc(t)+'</b></p>'; }
+
+  h.push(head(F.roadmap.title));
+  h.push(tbl(['설계 단계','차시','핵심 질문'], F.roadmap.rows));
+
+  h.push(head(F.mapping.title));
+  h.push('<p class="note">'+esc(F.mapping.note)+'</p>');
+  h.push(tbl(['백워드 설계(UbD)','교육부 4단계 모델','공유하는 설계 논리'], F.mapping.rows));
+
+  h.push(head('교육과정이 요구하는 전환'));
+  h.push(tbl(['관점','무엇에서','무엇으로'],
+        F.directions.map(function(d){ return [d.key, d.from, d.to]; })));
+
+  h.push(head('좋은 핵심 탐구 질문의 5가지 조건'));
+  F.essentialConditions.forEach(function(c){ h.push('<div class="checkline"><span>'+esc(c)+'</span></div>'); });
+
+  h.push(head(F.questionTypes.title));
+  h.push(tbl(['유형','묻는 말','역할','주로 대응하는 범주'], F.questionTypes.rows));
+  h.push('<p class="note">'+esc(F.questionTypes.note)+'</p>');
+
+  h.push(head('GRASPS — 실제적 수행과제를 만드는 6요소'));
+  h.push(tbl(['요소','내용'], F.grasps.map(function(g){ return [g.k, g.v]; })));
+
+  h.push(head('분석적 루브릭의 4수준'));
+  h.push(tbl(['수준','수행의 모습(예)'], F.rubricLevels));
+
+  h.push(head('학습 경험 4단계와 역순 배치 질문'));
+  h.push(tbl(['단계','목적','거꾸로 묻는 질문'],
+        F.learningPhases.map(function(p){ return [p.k, p.v, p.q]; })));
+
+  h.push(head('수업 나눔 — ' + F.sharing.title.replace('수업 나눔 — ','')));
+  h.push('<p class="note"><b>Glow · 칭찬</b><br>'+F.sharing.glow.map(esc).join('<br>')+'</p>');
+  h.push('<p class="note"><b>Grow · 질문</b><br>'+F.sharing.grow.map(esc).join('<br>')+'</p>');
+
+  h.push(head('자주 나타나는 오해'));
+  F.cautions.forEach(function(c){ h.push('<p class="note">'+esc(c)+'</p>'); });
+
+  F.quotes.forEach(function(q){
+    h.push('<div class="quote">“'+esc(q.text)+'”<cite>— '+esc(q.from)+'</cite></div>');
+  });
+  $('fwHost').innerHTML=h.join('');
+  openMask('maskFramework');
+}
+
+/* ---------------- 미리보기 ---------------- */
+function designPayload(){
+  var u=currentUnit();
+  return {
+    meta: {
+      school:state.meta.school, teacher:state.meta.teacher,
+      subject:u?u.subject:'', area:u?u.area:'', unit:u?u.name:'',
+      grade:state.meta.grade, periods:state.meta.periods,
+      standards:selectedStandards(u), note:''
+    },
+    stages: state.stages,
+    lessons: state.lessons,
+    alignment: lastAlignment
+  };
+}
+function showPreview(){
+  var u=currentUnit();
+  if(!u){ toast('먼저 단원을 선택하세요.'); return; }
+  var m=designPayload().meta, h=[];
+  h.push('<div class="doc">');
+  h.push('<h1>깊이 있는 수업·평가 설계안</h1>');
+  h.push('<div class="dsub">'+esc([m.subject,m.area,m.unit].filter(Boolean).join('  ·  '))+'</div>');
+  h.push('<table><tr><th>학교</th><td>'+esc(m.school)+'</td><th>교사</th><td>'+esc(m.teacher)+'</td></tr>'+
+         '<tr><th>과목</th><td>'+esc(m.subject)+'</td><th>대상</th><td>'+esc(m.grade)+'</td></tr>'+
+         '<tr><th>영역</th><td>'+esc(m.area)+'</td><th>차시</th><td>'+esc(m.periods)+'</td></tr>'+
+         '<tr><th>단원</th><td>'+esc(m.unit)+'</td><th>작성일</th><td>'+esc(BOOT.today)+'</td></tr></table>');
+  h.push('<h2>관련 성취기준</h2><table>');
+  m.standards.forEach(function(s){ h.push('<tr><th>['+esc(s.code)+']</th><td>'+esc(s.text)+'</td></tr>'); });
+  h.push('</table>');
+  BOOT.stages.forEach(function(st){
+    var d=state.stages[st.id]||{};
+    h.push('<h2>'+esc(st.label)+'  '+esc(st.name)+'</h2>');
+    h.push('<p class="dq">생각해볼 질문 : '+esc(st.question)+'<br>'+esc(st.mapping)+'</p>');
+    h.push('<table>');
+    st.fields.forEach(function(f){
+      h.push('<tr><th>'+esc(f.label)+'</th><td>'+esc(d[f.key]||'')+'</td></tr>');
+    });
+    h.push('</table>');
+  });
+  var used=state.lessons.filter(function(r){ return r && (r.element||r.material); });
+  if(used.length){
+    h.push('<h2>차시별 수업 설계 (내용 요소 × 수업 소재)</h2>');
+    h.push('<table><tr><th style="width:14%">학습 단계</th><th style="width:11%">차시</th>'+
+           '<th style="width:24%">내용 요소</th><th>수업 소재</th></tr>');
+    used.forEach(function(r){
+      h.push('<tr><td>'+esc(r.phase||'')+'</td><td>'+esc(r.periods||'')+'</td><td>'+
+             esc(r.element||'')+'</td><td>'+esc(r.material||'')+'</td></tr>');
+    });
+    h.push('</table>');
+    used.forEach(function(r,i){
+      h.push('<h3>'+(i+1)+'. '+esc(r.element||'')+(r.periods?'  ('+esc(r.periods)+')':'')+
+             (r.phase?'  · '+esc(r.phase):'')+'</h3>');
+      h.push('<table>'+
+        '<tr><th>수업 소재</th><td>'+esc(r.material||'')+'</td></tr>'+
+        '<tr><th>여는 질문</th><td>'+esc(r.open||'')+'</td></tr>'+
+        '<tr><th>도달 목표</th><td>'+esc(r.goal||'')+'</td></tr>'+
+        '<tr><th>확인할 증거</th><td>'+esc(r.evidence||'')+'</td></tr>'+
+        '<tr><th>학생 활동</th><td>'+esc(r.activity||'')+'</td></tr>'+
+        '<tr><th>도구</th><td>'+esc(r.tool||'')+'</td></tr></table>');
+    });
+  }
+  h.push('</div>');
+  $('previewHost').innerHTML=h.join('');
+  openMask('maskPreview');
+}
+
+/* ---------------- 한글 문서 ---------------- */
+function downloadHwpx(){
+  var u=currentUnit();
+  if(!u){ toast('먼저 단원을 선택하세요.'); return; }
+  toast('한글 문서를 만드는 중입니다…');
+  google.script.run
+    .withSuccessHandler(function(r){
+      try{
+        var bin=atob(r.b64), arr=new Uint8Array(bin.length);
+        for(var i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+        var blob=new Blob([arr],{type:'application/octet-stream'});
+        var url=URL.createObjectURL(blob);
+        var a=document.createElement('a');
+        a.href=url; a.download=r.name;
+        document.body.appendChild(a); a.click();
+        setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); },1500);
+        toast('내려받았습니다. 저장이 안 되면 [드라이브에 저장]을 눌러 주세요.');
+      }catch(err){
+        $('driveResult').innerHTML='<p class="note">브라우저 저장이 막혀 있습니다. 아래 버튼을 눌러 주세요.</p>';
+        openMask('maskDrive');
+      }
+    })
+    .withFailureHandler(function(e){ toast('문서 생성 오류: '+e.message); })
+    .api_makeHwpx(designPayload());
+}
+function saveToDrive(){
+  var u=currentUnit();
+  if(!u){ toast('먼저 단원을 선택하세요.'); return; }
+  $('driveResult').innerHTML='<p class="note">저장 중…</p>';
+  google.script.run
+    .withSuccessHandler(function(r){
+      $('driveResult').innerHTML='<p class="note"><b>'+esc(r.name)+'</b> 을(를) 저장했습니다.<br>'+
+        '<a href="'+r.download+'" target="_blank" rel="noopener">내려받기</a> · '+
+        '<a href="'+r.url+'" target="_blank" rel="noopener">드라이브에서 열기</a></p>';
+    })
+    .withFailureHandler(function(e){ $('driveResult').innerHTML='<p class="note">오류: '+esc(e.message)+'</p>'; })
+    .api_saveHwpxToDrive(designPayload());
+}
+
+/* ---------------- 내보내기 · 불러오기 ---------------- */
+function exportJson(){
+  var data=JSON.stringify(state,null,2);
+  try{
+    var blob=new Blob([data],{type:'application/json'});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');
+    var u=currentUnit();
+    a.href=url; a.download=(u?u.subject+'_'+u.name:'수업설계')+'_설계안.json';
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); },1500);
+    toast('설계안을 파일로 내보냈습니다.');
+  }catch(e){ toast('내보내기가 막혀 있습니다. 브라우저 설정을 확인해 주세요.'); }
+}
+function importJson(ev){
+  var f=ev.target.files && ev.target.files[0];
+  if(!f) return;
+  var fr=new FileReader();
+  fr.onload=function(){
+    try{
+      var s=JSON.parse(fr.result);
+      if(!s || !s.stages) throw new Error('형식이 올바르지 않습니다.');
+      state.mode=s.mode||state.mode;
+      state.current=s.current||0;
+      state.unitId=s.unitId||state.unitId;
+      state.meta=s.meta||state.meta;
+      state.stages=s.stages;
+      state.lessons=s.lessons||[];
+      state.checks=s.checks||{};
+      state.standardOverrides=s.standardOverrides||{};
+      state.unitDrafts=s.unitDrafts||{};
+      state.operationPlans=Array.isArray(s.operationPlans)?s.operationPlans:[];
+      fillSubjects(); applyMetaToInputs(); render(); save();
+      toast('설계안을 불러왔습니다.');
+    }catch(e){ toast('불러오기 실패: '+e.message); }
+  };
+  fr.readAsText(f);
+  ev.target.value='';
+}
+
+/* ---------------- 임시저장 ---------------- */
+var saveTimer=null;
+function save(){
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(function(){
+    try{
+      localStorage.setItem(STORE_KEY, JSON.stringify(state));
+      $('saveInfo').textContent='임시저장됨 · '+new Date().toLocaleTimeString('ko-KR');
+    }catch(e){ $('saveInfo').textContent='이 브라우저에서는 임시저장이 지원되지 않습니다.'; }
+  },400);
+}
+function restore(){
+  try{
+    var raw=localStorage.getItem(STORE_KEY);
+    if(!raw) return;
+    var s=JSON.parse(raw);
+    if(s && s.stages){
+      state.mode=s.mode||'training';
+      state.current=s.current||0;
+      state.unitId=s.unitId||'';
+      state.meta=s.meta||state.meta;
+      state.stages=s.stages;
+      state.lessons=s.lessons||[];
+      state.checks=s.checks||{};
+      state.standardOverrides=s.standardOverrides||{};
+      state.unitDrafts=s.unitDrafts||{};
+      state.operationPlans=Array.isArray(s.operationPlans)?s.operationPlans:[];
+      document.querySelectorAll('#modeSwitch button').forEach(function(x){
+        x.classList.toggle('on', x.getAttribute('data-mode')===state.mode);
+      });
+    }
+  }catch(e){ /* 무시 */ }
+}
+function applyMetaToInputs(){
+  $('inSchool').value=state.meta.school||'';
+  $('inTeacher').value=state.meta.teacher||'';
+  $('inGrade').value=state.meta.grade||'';
+  $('inPeriods').value=state.meta.periods||'';
+  $('inContext').value=state.meta.context||'';
+  renderStandards();
+}
+</script>

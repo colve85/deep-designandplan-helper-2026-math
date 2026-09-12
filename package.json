@@ -1,0 +1,16 @@
+{
+  "name": "deep-design-helper",
+  "version": "2.7.0",
+  "description": "2022 개정 교육과정 백워드 설계를 위한 Google Apps Script 웹앱 — 목표 → 증거 → 학습 경험",
+  "private": true,
+  "scripts": {
+    "verify": "node tools/verify.js && node tools/verify-extension.js && node tools/verify-operation.js",
+    "dev": "node tools/dev-server.js",
+    "push": "clasp push"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "author": "유경현 (인월고등학교)"
+}
