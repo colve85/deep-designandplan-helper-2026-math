@@ -13,7 +13,8 @@ ui.BOOT=c.api_bootstrap();
 const realRender=ui.opRender;
 ui.opRender=ui.save=ui.toast=function(){};
 assert(ui.opAllSubjects_().length>1);
-assert(ui.opAllSubjects_().includes('중학교 수학'));
+assert(ui.opAllSubjects_().includes('중학교 1학년 1학기'));
+assert.equal(ui.opAllSubjects_().filter(s=>s.startsWith('중학교')).length,6);
 for (const u of c.getAllUnits_()) {
   ui.state.unitId=u.id;ui.state.stages={0:{},1:{},2:{},3:{}};ui.state.lessons=[];
   ui.state.operationPlans=[ui.opEmpty()];ui.opActive=0;ui.opAppend();
@@ -59,12 +60,13 @@ assert.equal(copy.sections.schedule[0].notes,'<수정> & 보존');
 assert(!c.api_makeOperationHwpx(copy).name.includes('2031'));
 console.log('운영 계획: 127단원 연결, 입력 보존, 일정 빈칸, 다른 학기 복사, JSON 및 HWPX 생성 PASS');
 for(const subject of ui.opAllSubjects_()){
- const official=c.getAllUnits_().filter(u=>u.subject===subject&&/^official-/.test(u.id));
+ const term=ui.opMiddleTerm_(subject);
+ const official=c.getAllUnits_().filter(u=>u.subject===(term?'중학교 수학':subject)&&/^official-/.test(u.id));
  const rows=ui.opCourseRows_(subject);
  const allowed=new Set(official.map(u=>u.officialName||u.area));
  for(const row of rows)for(const title of row.unit.split('\n'))assert(allowed.has(title),subject+': '+title);
  const standards=rows.map(r=>r.standards).join('\n');
- for(const unit of official)for(const s of unit.standards)assert(standards.includes('['+s.code+']'),s.code);
+ for(const unit of official)for(const s of unit.standards){const place=ui.opMiddlePlacement_(s.code);if(!term||(place[0]===Number(term[1])&&place[1]===Number(term[2])))assert(standards.includes('['+s.code+']'),s.code);}
  assert(!standards.includes('교사 재구성 목표'));
 }
 const legacy=ui.opEmpty();legacy.meta.subject='대수';
@@ -87,3 +89,17 @@ ui.opRepairTitles_(codePlan);
 assert.equal(codePlan.sections.schedule[0].unit,'함수의 극한과 연속');
 assert.equal(codePlan.sections.schedule[0]._previousUnitTitle,'예전 버전의 요금 탐구 제목');
 console.log('127단원 줄바꿈·과목 표기 차이·이전 제목의 코드 대조 교정 PASS');
+const middleCodes=c.getAllUnits_().filter(u=>u.subject==='중학교 수학').flatMap(u=>u.standards.map(s=>s.code));
+const counts={};
+for(const subject of ui.opAllSubjects_().filter(s=>s.startsWith('중학교'))){
+ const rows=ui.opCourseRows_(subject);assert.equal(rows.length,17);
+ const text=rows.map(r=>r.standards).join('\n');
+ const codes=[...new Set([...text.matchAll(/\[([^\]]+)\]/g)].map(m=>m[1]))];
+ assert(codes.length>0);
+ for(const code of codes)counts[code]=(counts[code]||0)+1;
+ const plan=ui.opEmpty();plan.meta.subject=subject;ui.opSeedSchedule(plan,true);
+ assert.equal(plan.meta.grade,subject.split(' ')[1]);assert.equal(plan.meta.semester,subject.match(/([12])학기/)[1]);
+}
+for(const code of middleCodes)assert.equal(counts[code],1,code+' 학기 누락/중복');
+assert.equal(Object.keys(counts).length,middleCodes.length);
+console.log('중학교 6학기 각각 17주·성취기준 60개 학기 간 중복/누락 없음 PASS');
