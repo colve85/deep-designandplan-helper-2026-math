@@ -2,6 +2,14 @@
 var opActive=0;
 function opPlans(){if(!Array.isArray(state.operationPlans))state.operationPlans=[];return state.operationPlans;}
 function opCurrent(){return opPlans()[opActive];}
+function opChooseSubject(subject){
+ if(opAllSubjects_().indexOf(subject)<0)return;
+ if(opCurrent()&&opCurrent().meta.subject===subject)return;
+ var found=opPlans().findIndex(function(p){return p.meta.subject===subject;});
+ if(found>=0)opActive=found;
+ else{var p=opEmpty();p.meta.subject=subject;opSeedSchedule(p,true);opPlans().push(p);opActive=opPlans().length-1;}
+ opRender();save();
+}
 function opCourseUnit_(){return currentUnit()||(BOOT.units||[])[0];}
 function opAllSubjects_(){var seen={},out=[];(BOOT.units||[]).forEach(function(u){if(u.subject&&!seen[u.subject]){seen[u.subject]=1;out.push(u.subject);}});return out;}
 function opEmpty(){
@@ -43,8 +51,10 @@ function opEnsureCurrentLevels(p){
 function opRender(){
  if(opActive>=opPlans().length)opActive=0;
  var p=opCurrent(),schema=BOOT.operationSchema;if(!p)return;opMigratePlan_(p);opSeedSchedule(p,false);
+ $('opSubject').innerHTML=['중학교','고등학교'].map(function(group){return '<optgroup label="'+group+'">'+opAllSubjects_().filter(function(s){return (s.indexOf('중학교')===0)===(group==='중학교');}).map(function(s){return '<option value="'+esc(s)+'"'+(s===p.meta.subject?' selected':'')+'>'+esc(s)+'</option>';}).join('')+'</optgroup>';}).join('');
+ $('opSubject').onchange=function(){opChooseSubject(this.value);};
  $('opSelect').innerHTML=opPlans().map(function(x,i){return '<option value="'+i+'"'+(i===opActive?' selected':'')+'>'+esc((x.meta.year||'학년도 미입력')+' / '+(x.meta.semester||'학기 미입력')+' / '+(x.meta.subject||'과목 미입력')+' ('+(i+1)+')')+'</option>';}).join('');
- var html='<div class="op-meta">'+schema.meta.map(function(c){if(c[0]==='subject')return '<label>'+esc(c[1])+'<select data-om="subject" aria-label="중·고등학교 수학 과목">'+opAllSubjects_().map(function(s){return '<option value="'+esc(s)+'"'+(s===p.meta.subject?' selected':'')+'>'+esc(s)+'</option>';}).join('')+'</select></label>';return '<label>'+esc(c[1])+'<input data-om="'+c[0]+'" value="'+esc(p.meta[c[0]])+'"></label>';}).join('')+'</div>';
+ var html='<div class="op-meta">'+schema.meta.filter(function(c){return c[0]!=='subject';}).map(function(c){return '<label>'+esc(c[1])+'<input data-om="'+c[0]+'" value="'+esc(p.meta[c[0]])+'"></label>';}).join('')+'</div>';
  schema.sections.forEach(function(s){
   html+='<details'+(s.key==='schedule'?' open':'')+'><summary>'+esc(s.title)+'</summary>';
   if(!s.cols)html+='<textarea rows="5" data-os="'+s.key+'" aria-label="'+esc(s.title)+'">'+esc(p.sections[s.key])+'</textarea>';

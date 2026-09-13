@@ -208,7 +208,10 @@
 <div class="mhead"><h3>한 학기 17주 교수학습·평가 계획</h3><button class="x" data-close>×</button></div>
 <div class="mbody">
 <p class="note">중학교·고등학교 수학 과목의 전체 단원·성취기준을 바탕으로 한 학기 약 17주 분량의 Ⅰ. 교수학습-평가 계획 초안을 만듭니다. 시기·시수·누계는 학교 행사와 시험 기간에 맞게 직접 수정하세요.</p>
-<div class="rowbtns"><select id="opSelect" aria-label="저장된 운영 계획"></select><button class="btn" id="opNew">새 과목 계획</button><button class="btn" id="opCopy">다른 학기용 복사 (일정 비우기)</button></div>
+<label for="opSubject"><b>과목 선택 — 중학교·고등학교 수학 전체</b></label>
+<select id="opSubject" aria-label="중학교·고등학교 전체 수학 과목" style="width:100%;margin:8px 0 16px"></select>
+<details><summary>저장된 계획 불러오기</summary><label for="opSelect">이전에 작성한 계획 (전체 과목 목록이 아닙니다)</label><select id="opSelect" aria-label="저장된 운영 계획"></select></details>
+<div class="rowbtns"><button class="btn" id="opNew">새 과목 계획</button><button class="btn" id="opCopy">다른 학기용 복사 (일정 비우기)</button></div>
 <div id="opEditor"></div><p id="opStatus" role="status" class="note"></p>
 </div><div class="mfoot" style="flex-wrap:wrap">
 <button class="btn pri" id="opAppend">현재 과목 17주 초안 다시 만들기</button><button class="btn" id="opCheck">입력 점검</button><button class="btn" id="opJson">17주 계획 JSON 저장</button>
