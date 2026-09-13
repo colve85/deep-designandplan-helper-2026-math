@@ -50,16 +50,33 @@ function opEnsureCurrentLevels(p){
  var seen={};(p.sections.levels||[]).forEach(function(r){seen[String(r.standard||'')+'|'+String(r.level||'')]=true;});
  p.sections.levels=(p.sections.levels||[]).concat(rows.filter(function(r){return !seen[r.standard+'|'+r.level];}));
 }
+function opTitleKey_(value){return String(value||'').normalize('NFKC').replace(/\s+/g,'');}
+function opRepairTitles_(plan){
+ if(!plan||!plan.sections)return;
+ var units=(BOOT.units||[]).filter(function(u){return opTitleKey_(u.subject)===opTitleKey_(plan.meta.subject);});
+ var official=units.filter(function(u){return /^official-/.test(u.id);});
+ (plan.sections.schedule||[]).forEach(function(row){
+  var old=String(row.unit||''), key=opTitleKey_(old), names=[];
+  // Saved text may contain line breaks, spaces, or a different Roman numeral glyph.
+  units.forEach(function(u){
+   if(u.name!==u.area&&key.indexOf(opTitleKey_(u.name))>=0)names.push(u.area);
+  });
+  // Old releases may contain titles no longer present in the example catalogue.
+  if(!names.length&&!row._officialTitleChecked){
+   var codes=opTitleKey_(row.standards);
+   official.forEach(function(u){if((u.standards||[]).some(function(s){return codes.indexOf(opTitleKey_(s.code))>=0;}))names.push(u.officialName||u.area);});
+  }
+  if(names.length){
+   var title=names.filter(function(v,i,a){return a.indexOf(v)===i;}).join('\n');
+   if(title!==old){if(row._previousUnitTitle===undefined)row._previousUnitTitle=old;row.unit=title;}
+  }
+  row._officialTitleChecked=true;
+ });
+}
 function opRender(){
  if(opActive>=opPlans().length)opActive=0;
  var activePlan=opCurrent();
- if(activePlan&&activePlan.sections)(activePlan.sections.schedule||[]).forEach(function(row){
-  var title=String(row.unit||'');
-  (BOOT.units||[]).filter(function(u){return u.subject===activePlan.meta.subject&&u.name!==u.area;}).sort(function(a,b){return b.name.length-a.name.length;}).forEach(function(u){
-   title=title.split(u.name).join(u.area);
-  });
-  row.unit=title;
- });
+ opRepairTitles_(activePlan);
  var p=opCurrent(),schema=BOOT.operationSchema;if(!p)return;opMigratePlan_(p);opSeedSchedule(p,false);
  $('opSubject').innerHTML=['중학교','고등학교'].map(function(group){return '<optgroup label="'+group+'">'+opAllSubjects_().filter(function(s){return (s.indexOf('중학교')===0)===(group==='중학교');}).map(function(s){return '<option value="'+esc(s)+'"'+(s===p.meta.subject?' selected':'')+'>'+esc(s)+'</option>';}).join('')+'</optgroup>';}).join('');
  $('opSubject').onchange=function(){opChooseSubject(this.value);};

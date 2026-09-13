@@ -7,7 +7,7 @@
  **********************************************************************/
 
 var APP_TITLE   = '깊이 있는 수업·평가 설계 도우미';
-var APP_VERSION = '2.8.7';
+var APP_VERSION = '2.8.8';
 var DEFAULT_MODEL = 'gemini-2.5-flash';
 function normalizeGeminiModel_(value) { var model=String(value||DEFAULT_MODEL).trim().replace(/^models\//,''); return model||DEFAULT_MODEL; }
 

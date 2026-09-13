@@ -75,3 +75,15 @@ assert.equal(legacy.sections.schedule[0].unit,'지수함수와 로그함수');
 assert.equal(legacy.sections.schedule[0].hours,'4');
 assert.equal(legacy.sections.schedule[0].elements,'교사 평가 요소');
 console.log('전 과목 공식 단원명·기준 포함 및 기존 제목 교정/교사 입력 보존 PASS');
+for(const unit of c.getAllUnits_()){
+ const row={unit:unit.name.split(' ').join('\n'),hours:'학교 시수',elements:'교사 평가 요소'};
+ const plan={meta:{subject:unit.subject.normalize('NFKC').replace('Ⅰ','I')},sections:{schedule:[row]}};
+ ui.opRepairTitles_(plan);
+ assert.equal(row.unit,unit.area,unit.id+' 줄바꿈 제목 교정');
+ assert.equal(row.hours,'학교 시수');assert.equal(row.elements,'교사 평가 요소');
+}
+const codePlan={meta:{subject:'미적분 I'},sections:{schedule:[{unit:'예전 버전의 요금 탐구 제목',standards:'[12미적Ⅰ-01-01]'}]}};
+ui.opRepairTitles_(codePlan);
+assert.equal(codePlan.sections.schedule[0].unit,'함수의 극한과 연속');
+assert.equal(codePlan.sections.schedule[0]._previousUnitTitle,'예전 버전의 요금 탐구 제목');
+console.log('127단원 줄바꿈·과목 표기 차이·이전 제목의 코드 대조 교정 PASS');
