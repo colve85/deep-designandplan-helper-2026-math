@@ -7,7 +7,7 @@
  **********************************************************************/
 
 var APP_TITLE   = '깊이 있는 수업·평가 설계 도우미';
-var APP_VERSION = '2.8.6';
+var APP_VERSION = '2.8.7';
 var DEFAULT_MODEL = 'gemini-2.5-flash';
 function normalizeGeminiModel_(value) { var model=String(value||DEFAULT_MODEL).trim().replace(/^models\//,''); return model||DEFAULT_MODEL; }
 
@@ -20,8 +20,8 @@ var DRIVE_FOLDER = '수업설계_한글문서';
  */
 var APP_CREDIT = {
   training: '2026 전북형 깊이 있는 수업·평가 설계 연수',
-  author:   '연수 자료 한윤석(성당중학교),                            설계 도구 제작  유경현(인월고등학교)',
-  doc:      '2026 전북형 깊이 있는 수업·평가 설계 연수 · 설계 도구 제작 유경현(인월고등학교)'
+  author:   '연수 자료 한윤석(성당중학교), 설계 도구 제작 유경현(인월고등학교) · 오류수정 및 문의(유경현 hyeonteacher@naver.com)',
+  doc:      '2026 전북형 깊이 있는 수업·평가 설계 연수 · 연수 자료 한윤석(성당중학교), 설계 도구 제작 유경현(인월고등학교) · 오류수정 및 문의(유경현 hyeonteacher@naver.com)'
 };
 
 function doGet(e) {

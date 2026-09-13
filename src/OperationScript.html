@@ -21,6 +21,8 @@ function opEmpty(){
 }
 function opCourseRows_(subject){
  var units=(BOOT.units||[]).filter(function(u){return !subject||u.subject===subject;}),cards=[],all=[],seen={};
+ var official=units.filter(function(u){return /^official-/.test(u.id);});
+ if(official.length)units=official;
  units.forEach(function(u){(u.standards||[]).forEach(function(s){if(!seen[s.code]){seen[s.code]=1;all.push({s:s,u:u});}});var lessons=u.lessons&&u.lessons.length?u.lessons:[{element:'핵심 개념 이해',activity:'개념과 표현을 탐구하고 근거를 설명한다.',evidence:'학습지·구두 설명',goal:'핵심 개념을 조건과 함께 설명한다.'}];lessons.forEach(function(l){cards.push({u:u,l:l});});});
  if(!units.length)return [];
  var out=[],n=17;
@@ -50,6 +52,14 @@ function opEnsureCurrentLevels(p){
 }
 function opRender(){
  if(opActive>=opPlans().length)opActive=0;
+ var activePlan=opCurrent();
+ if(activePlan&&activePlan.sections)(activePlan.sections.schedule||[]).forEach(function(row){
+  var title=String(row.unit||'');
+  (BOOT.units||[]).filter(function(u){return u.subject===activePlan.meta.subject&&u.name!==u.area;}).sort(function(a,b){return b.name.length-a.name.length;}).forEach(function(u){
+   title=title.split(u.name).join(u.area);
+  });
+  row.unit=title;
+ });
  var p=opCurrent(),schema=BOOT.operationSchema;if(!p)return;opMigratePlan_(p);opSeedSchedule(p,false);
  $('opSubject').innerHTML=['중학교','고등학교'].map(function(group){return '<optgroup label="'+group+'">'+opAllSubjects_().filter(function(s){return (s.indexOf('중학교')===0)===(group==='중학교');}).map(function(s){return '<option value="'+esc(s)+'"'+(s===p.meta.subject?' selected':'')+'>'+esc(s)+'</option>';}).join('')+'</optgroup>';}).join('');
  $('opSubject').onchange=function(){opChooseSubject(this.value);};
