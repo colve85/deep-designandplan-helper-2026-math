@@ -7,7 +7,7 @@
  **********************************************************************/
 
 var APP_TITLE   = '깊이 있는 수업·평가 설계 도우미';
-var APP_VERSION = '2.9.1';
+var APP_VERSION = '2.9.5';
 var DEFAULT_MODEL = 'gemini-3.6-flash';
 function normalizeGeminiModel_(value) { var model=String(value||DEFAULT_MODEL).trim().replace(/^models\//,''); return model||DEFAULT_MODEL; }
 
@@ -20,8 +20,8 @@ var DRIVE_FOLDER = '수업설계_한글문서';
  */
 var APP_CREDIT = {
   training: '2026 전북형 깊이 있는 수업·평가 설계 연수',
-  author:   '자료 소스: 2026 중등 전북형 깊이있는 수업·평가 설계 연수 TF팀 · 성당중 한윤석 / 오류수정 문의(인월고 유경현 hyeonteacher@naver.com)',
-  doc:      '2026 중등 전북형 깊이있는 수업·평가 설계 연수 TF팀 · 성당중 한윤석 / 오류수정 문의(인월고 유경현 hyeonteacher@naver.com)'
+  author:   '자료 소스: 2026 중등 전북형 깊이있는 수업·평가 설계 연수 TF팀 · 성당중 한윤석 / 오류수정 문의: 인월고 유경현 (hyeonteacher@naver.com)',
+  doc:      '2026 중등 전북형 깊이있는 수업·평가 설계 연수 TF팀 · 성당중 한윤석 / 오류수정 문의: 인월고 유경현 (hyeonteacher@naver.com)'
 };
 
 function doGet(e) {
