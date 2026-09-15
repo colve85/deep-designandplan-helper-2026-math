@@ -20,8 +20,8 @@ var DRIVE_FOLDER = '수업설계_한글문서';
  */
 var APP_CREDIT = {
   training: '2026 전북형 깊이 있는 수업·평가 설계 연수',
-  author:   '연수 자료: 2026 중등 전북형 깊이있는 수업·평가 설계 연수 TF팀 · 웹앱제작 및 오류수정 문의(인월고 유경현 hyeonteacher@naver.com)',
-  doc:      '2026 중등 전북형 깊이있는 수업·평가 설계 연수 TF팀 · 성당중 한윤석 · 제작 및 오류수정 문의(인월고 유경현 hyeonteacher@naver.com)'
+  author:   '연수 자료: 2026 중등 전북형 깊이있는 수업·평가 설계 연수 TF팀 · 성당중 한윤석 · 오류수정 문의(인월고 유경현 hyeonteacher@naver.com)',
+  doc:      '2026 중등 전북형 깊이있는 수업·평가 설계 연수 TF팀 · 성당중 한윤석 · 오류수정 문의(인월고 유경현 hyeonteacher@naver.com)'
 };
 
 function doGet(e) {
